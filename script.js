@@ -1,15 +1,14 @@
 // ============================================
 // SOSSOU KOUAMÉ — Paiement en Ligne
-// Intégration Money Fusion / FusionPay
+// Frontend appelle le serveur backend, pas Money Fusion directement
 // ============================================
 
-// ─── CONFIGURATION API MONEY FUSION ──────────────────────────────────────
-// Remplace par ton vrai lien API depuis ton dashboard
-const API_URL = "https://www.pay.moneyfusion.net/Test_de_paiement/pay/";
+// ─── CONFIGURATION ─────────────────────────────────────────────────────────
+// L'URL de TON serveur (Render ou local)
+const SERVER_URL = window.location.origin; // Auto-detect: https://ton-site.onrender.com ou http://localhost:3000
 
-// ─── TOUS LES PAYS DU MONDE AVEC RÉSEAUX MOBILE MONEY ───────────────────
+// ─── TOUS LES PAYS DU MONDE ──────────────────────────────────────────────
 const COUNTRIES = {
-  // Afrique de l'Ouest
   "bj": { name: "Bénin", flag: "🇧🇯", code: "+229", currency: "XOF",
     networks: [
       { key: "mtn", name: "MTN", color: "#FFCC00", textColor: "#000" },
@@ -153,7 +152,6 @@ const COUNTRIES = {
       { key: "orange", name: "Orange", color: "#FF6600", textColor: "#fff" }
     ]
   },
-  // Afrique du Nord
   "ma": { name: "Maroc", flag: "🇲🇦", code: "+212", currency: "MAD",
     networks: [
       { key: "inwi", name: "Inwi", color: "#FF6600", textColor: "#fff" },
@@ -192,7 +190,6 @@ const COUNTRIES = {
       { key: "mtn", name: "MTN", color: "#FFCC00", textColor: "#000" }
     ]
   },
-  // Europe
   "fr": { name: "France", flag: "🇫🇷", code: "+33", currency: "EUR",
     networks: [
       { key: "orange", name: "Orange", color: "#FF6600", textColor: "#fff" },
@@ -258,7 +255,6 @@ const COUNTRIES = {
       { key: "salt", name: "Salt", color: "#E60000", textColor: "#fff" }
     ]
   },
-  // Amériques
   "us": { name: "États-Unis", flag: "🇺🇸", code: "+1", currency: "USD",
     networks: [
       { key: "venmo", name: "Venmo", color: "#3D95CE", textColor: "#fff" },
@@ -305,7 +301,6 @@ const COUNTRIES = {
       { key: "plin", name: "Plin", color: "#E60000", textColor: "#fff" }
     ]
   },
-  // Asie
   "cn": { name: "Chine", flag: "🇨🇳", code: "+86", currency: "CNY",
     networks: [
       { key: "alipay", name: "Alipay", color: "#1677FF", textColor: "#fff" },
@@ -371,7 +366,6 @@ const COUNTRIES = {
       { key: "grabpay", name: "GrabPay", color: "#00B140", textColor: "#fff" }
     ]
   },
-  // Moyen-Orient
   "ae": { name: "Émirats Arabes Unis", flag: "🇦🇪", code: "+971", currency: "AED",
     networks: [
       { key: "applepay", name: "Apple Pay", color: "#000000", textColor: "#fff" }
@@ -393,7 +387,6 @@ const COUNTRIES = {
       { key: "knet", name: "KNET", color: "#0066CC", textColor: "#fff" }
     ]
   },
-  // Océanie
   "au": { name: "Australie", flag: "🇦🇺", code: "+61", currency: "AUD",
     networks: [
       { key: "paypal", name: "PayPal", color: "#003087", textColor: "#fff" }
@@ -406,7 +399,7 @@ const COUNTRIES = {
   }
 };
 
-// ─── CRYPTO WALLETS ──────────────────────────────────────────────────────
+// ─── CRYPTO WALLETS ────────────────────────────────────────────────────────
 const CRYPTO_WALLETS = [
   { id: "BTC", name: "Bitcoin", symbol: "BTC", icon: "₿", address: "bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh", min: "0.001 BTC" },
   { id: "ETH", name: "Ethereum", symbol: "ETH", icon: "Ξ", address: "0x71C7656EC7ab88b098defB751B7401B5f6d8976F", min: "0.01 ETH" },
@@ -616,7 +609,8 @@ function initiatePayment() {
   }
 }
 
-// ─── MOBILE MONEY PAYMENT (comme ton code) ──────────────────────────────
+// ─── MOBILE MONEY PAYMENT ────────────────────────────────────────────────
+// Le frontend appelle TON SERVEUR, pas Money Fusion directement
 function payMobileMoney(amount, name, desc) {
   const phone = document.getElementById("phoneInput").value.trim().replace(/\s/g, "");
   const fullPhone = selectedCountry.code + phone;
@@ -630,46 +624,48 @@ function payMobileMoney(amount, name, desc) {
     return_url: window.location.origin + "/success.html?amount=" + amount + "&currency=" + currency + "&phone=" + encodeURIComponent(fullPhone) + "&name=" + encodeURIComponent(name) + "&network=" + encodeURIComponent(selectedNetwork.name),
   };
 
-  axios.post(API_URL, paymentData)
-    .then(res => {
-      const data = res.data;
-      if (data.statut === true || data.success === true) {
-        // Sauvegarde historique
-        saveToHistory({
-          token: data.token || data.tokenPay,
-          date: new Date().toISOString(),
-          name: name,
-          phone: fullPhone,
-          amount: amount,
-          currency: currency,
-          network: selectedNetwork.name,
-          country: selectedCountry.name,
-          status: "pending",
-          mode: "mobile"
-        });
+  // APPEL VERS TON SERVEUR (pas Money Fusion directement)
+  fetch(SERVER_URL + "/api/create-payment", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(paymentData)
+  })
+  .then(res => res.json())
+  .then(data => {
+    if (data.statut === true || data.success === true) {
+      saveToHistory({
+        token: data.token || data.tokenPay,
+        date: new Date().toISOString(),
+        name: name,
+        phone: fullPhone,
+        amount: amount,
+        currency: currency,
+        network: selectedNetwork.name,
+        country: selectedCountry.name,
+        status: "pending",
+        mode: "mobile"
+      });
 
-        // Redirection vers la page de paiement Money Fusion (comme ton code)
-        if (data.url) {
-          window.location.href = data.url;
-        } else {
-          showResult("success", "Paiement initié ! Token: " + (data.token || data.tokenPay));
-        }
+      if (data.url) {
+        window.location.href = data.url;
       } else {
-        showResult("error", data.message || "Erreur lors du paiement");
+        showResult("success", "Paiement initié ! Token: " + (data.token || data.tokenPay));
       }
-    })
-    .catch(err => {
-      console.error(err);
-      showResult("error", "Erreur de connexion. Vérifiez votre configuration Money Fusion.");
-    })
-    .finally(() => {
-      resetButton();
-    });
+    } else {
+      showResult("error", data.message || data.error || "Erreur lors du paiement");
+    }
+  })
+  .catch(err => {
+    console.error(err);
+    showResult("error", "Erreur de connexion. Vérifiez que votre serveur est en ligne.");
+  })
+  .finally(() => {
+    resetButton();
+  });
 }
 
 // ─── CRYPTO PAYMENT ──────────────────────────────────────────────────────
 function payCrypto(amount, name, desc) {
-  // Pour crypto, on affiche les instructions
   showResult("success", `
     <h4>✅ Paiement Crypto</h4>
     <p>Envoyez <strong>${amount} ${selectedCrypto.symbol}</strong> à l'adresse :</p>

@@ -12,7 +12,6 @@
 </head>
 <body>
 
-  <!-- Navbar -->
   <nav class="navbar">
     <div class="nav-container">
       <a href="#" class="logo-link">
@@ -31,14 +30,12 @@
     </div>
   </nav>
 
-  <!-- Mobile Menu -->
   <div class="mobile-menu">
     <a href="#payer" class="mobile-nav-link">Payer</a>
     <a href="#historique" class="mobile-nav-link">Historique</a>
   </div>
 
   <main>
-    <!-- Hero -->
     <section class="hero">
       <div class="hero-content">
         <h1 class="hero-title">PAIEMENT EN LIGNE</h1>
@@ -46,7 +43,6 @@
       </div>
     </section>
 
-    <!-- Paiement Section -->
     <section id="payer" class="section">
       <div class="container">
         <div class="section-header">
@@ -60,7 +56,6 @@
         </div>
 
         <div class="payment-card">
-          <!-- Mode de paiement -->
           <div class="form-group">
             <label>Mode de paiement</label>
             <div class="payment-mode-grid">
@@ -75,7 +70,6 @@
             </div>
           </div>
 
-          <!-- Pays -->
           <div class="form-group" id="countryGroup">
             <label for="countrySelect">Pays</label>
             <div class="input-wrapper">
@@ -90,19 +84,16 @@
             </div>
           </div>
 
-          <!-- Réseau Mobile Money -->
           <div class="form-group" id="networkGroup" style="display:none;">
             <label>Sélectionnez un réseau</label>
             <div class="network-grid" id="networkGrid"></div>
           </div>
 
-          <!-- Crypto wallets (affiché seulement en mode crypto) -->
           <div class="form-group" id="cryptoWalletsGroup" style="display:none;">
             <label>Adresse de dépôt</label>
             <div class="crypto-grid" id="cryptoGrid"></div>
           </div>
 
-          <!-- Numéro de téléphone -->
           <div class="form-group" id="phoneGroup" style="display:none;">
             <label for="phoneInput">Numéro de téléphone à débiter</label>
             <div class="input-wrapper phone-wrapper">
@@ -112,7 +103,6 @@
             </div>
           </div>
 
-          <!-- Montant -->
           <div class="form-group" id="amountGroup" style="display:none;">
             <label for="amountInput">Montant à payer</label>
             <div class="input-wrapper amount-wrapper">
@@ -121,7 +111,6 @@
             </div>
           </div>
 
-          <!-- Nom du client -->
           <div class="form-group" id="nameGroup" style="display:none;">
             <label for="clientName">Nom du client</label>
             <div class="input-wrapper">
@@ -133,25 +122,21 @@
             </div>
           </div>
 
-          <!-- Description (optionnel) -->
           <div class="form-group" id="descGroup" style="display:none;">
             <label for="paymentDesc">Description (optionnel)</label>
             <input type="text" id="paymentDesc" placeholder="Ex: Achat de montre">
           </div>
 
-          <!-- Bouton Payer -->
           <button id="payBtn" class="btn-primary-large" onclick="initiatePayment()" style="display:none;">
             <span id="btnText">Payer maintenant</span>
             <span id="btnLoader" class="loader hidden"></span>
           </button>
 
-          <!-- Résultat -->
           <div id="result" class="result-container hidden"></div>
         </div>
       </div>
     </section>
 
-    <!-- Historique Section -->
     <section id="historique" class="section bg-light">
       <div class="container">
         <div class="section-header">
@@ -202,7 +187,6 @@
     </div>
   </footer>
 
-  <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
   <script src="script.js"></script>
 </body>
 </html>
