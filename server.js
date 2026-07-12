@@ -43,6 +43,24 @@ app.use((req, res, next) => {
 app.use(express.static(__dirname));
 
 // ============================================================
+// ROUTE: Récupérer l'IP du serveur (pour Money Fusion whitelist)
+// GET /my-ip
+// ============================================================
+app.get("/my-ip", async (req, res) => {
+  try {
+    const response = await fetch("https://api.ipify.org?format=json");
+    const data = await response.json();
+    res.json({
+      ip: data.ip,
+      message: "Ajoute cette IP dans ton dashboard Money Fusion > Adresses IP autorisées",
+      dashboard_url: "https://pay.moneyfusion.net/dashboard"
+    });
+  } catch (err) {
+    res.status(500).json({ error: "Impossible de récupérer l'IP", details: err.message });
+  }
+});
+
+// ============================================================
 // ROUTE: Créer un paiement (PROXY vers Money Fusion)
 // POST /api/create-payment
 // Le frontend appelle CETTE route, pas Money Fusion directement
@@ -147,5 +165,6 @@ app.listen(PORT, () => {
   console.log(`Port: ${PORT}`);
   console.log(`API Money Fusion: ${CONFIG.API_URL}`);
   console.log(`Clé API: ${CONFIG.API_KEY ? "CONFIGURÉE" : "NON CONFIGURÉE"}`);
+  console.log(`Récupérer l'IP: http://localhost:${PORT}/my-ip`);
   console.log(`========================================`);
 });
