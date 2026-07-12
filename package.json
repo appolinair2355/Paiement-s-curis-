@@ -1,7 +1,7 @@
 {
   "name": "sossou-kouame-paiement",
   "version": "1.0.0",
-  "description": "Paiement Mobile Money - Sossou Kouamé via Money Fusion",
+  "description": "Paiement Mobile Money & Crypto - Sossou Kouamé via Money Fusion",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"

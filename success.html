@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Paiement Réussi — Sossou Kouamé</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Poppins', sans-serif;
+      display: flex; align-items: center; justify-content: center;
+      min-height: 100vh;
+      background: linear-gradient(135deg, #0D1B3E, #1E3A5F);
+      color: white;
+    }
+    .card {
+      background: white; color: #1F2937;
+      padding: 48px 40px; border-radius: 24px;
+      text-align: center; max-width: 420px; width: 90%;
+      box-shadow: 0 25px 50px rgba(0,0,0,0.3);
+    }
+    .success-icon {
+      width: 80px; height: 80px; background: #D1FAE5;
+      border-radius: 50%; display: flex; align-items: center; justify-content: center;
+      margin: 0 auto 24px;
+    }
+    .success-icon svg { color: #059669; }
+    h1 { font-size: 1.6rem; color: #059669; margin-bottom: 12px; }
+    p { color: #4B5563; line-height: 1.6; margin-bottom: 8px; }
+    .token-box {
+      background: #F3F4F6; padding: 14px; border-radius: 12px;
+      font-family: monospace; font-weight: 700; color: #0D1B3E;
+      margin: 20px 0; word-break: break-all;
+      border: 2px dashed #C9A84C;
+    }
+    .amount-display {
+      font-size: 2rem; font-weight: 800; color: #0D1B3E;
+      margin: 16px 0;
+    }
+    .btn-home {
+      display: inline-block; margin-top: 24px;
+      padding: 16px 40px; background: #DC2626; color: white;
+      text-decoration: none; border-radius: 14px; font-weight: 700;
+      font-size: 1.1rem; transition: all 0.3s;
+    }
+    .btn-home:hover { background: #B91C1C; transform: translateY(-2px); }
+    .details {
+      margin-top: 20px; padding-top: 20px;
+      border-top: 1px solid #E5E7EB;
+      text-align: left;
+    }
+    .detail-row {
+      display: flex; justify-content: space-between;
+      padding: 8px 0; font-size: 0.9rem;
+    }
+    .detail-label { color: #9CA3AF; }
+    .detail-value { font-weight: 600; color: #1F2937; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="success-icon">
+      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+        <polyline points="22 4 12 14.01 9 11.01"></polyline>
+      </svg>
+    </div>
+    <h1>Paiement Réussi !</h1>
+    <p>Votre transaction a été traitée avec succès.</p>
+    <div class="amount-display" id="amountDisplay"></div>
+    <p>Vous recevrez une confirmation par SMS.</p>
+    <div class="token-box" id="tokenDisplay"></div>
+    <div class="details" id="detailsBox"></div>
+    <a href="/" class="btn-home">Retour à l'accueil</a>
+  </div>
+
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get('token') || 'N/A';
+    const amount = params.get('amount') || '';
+    const currency = params.get('currency') || 'XOF';
+    const phone = params.get('phone') || '';
+    const name = params.get('name') || '';
+    const network = params.get('network') || '';
+
+    if (amount) {
+      document.getElementById('amountDisplay').textContent = amount + ' ' + currency;
+    }
+    document.getElementById('tokenDisplay').textContent = 'Token: ' + token;
+
+    let detailsHtml = '';
+    if (name) detailsHtml += '<div class="detail-row"><span class="detail-label">Client</span><span class="detail-value">' + name + '</span></div>';
+    if (phone) detailsHtml += '<div class="detail-row"><span class="detail-label">Numéro</span><span class="detail-value">' + phone + '</span></div>';
+    if (network) detailsHtml += '<div class="detail-row"><span class="detail-label">Réseau</span><span class="detail-value">' + network + '</span></div>';
+    if (detailsHtml) document.getElementById('detailsBox').innerHTML = detailsHtml;
+  </script>
+</body>
+</html>

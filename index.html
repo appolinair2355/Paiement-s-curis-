@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Sossou Kouamé — Paiement Mobile Money</title>
+  <title>Sossou Kouamé — Paiement en Ligne</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
@@ -16,7 +16,7 @@
   <nav class="navbar">
     <div class="nav-container">
       <a href="#" class="logo-link">
-        <img src="logo-sk.png" alt="Logo SK" class="logo-img">
+        <img src="logo-sk.png" alt="Logo SK" class="logo-img" onerror="this.style.display='none'">
         <span class="logo-text">SOSSOU KOUAMÉ</span>
       </a>
       <div class="nav-links">
@@ -41,8 +41,8 @@
     <!-- Hero -->
     <section class="hero">
       <div class="hero-content">
-        <h1 class="hero-title">PAIEMENT MOBILE MONEY</h1>
-        <p class="hero-subtitle">Payez en toute sécurité en Afrique de l'Ouest</p>
+        <h1 class="hero-title">PAIEMENT EN LIGNE</h1>
+        <p class="hero-subtitle">Mobile Money & Crypto — Partout dans le monde</p>
       </div>
     </section>
 
@@ -60,8 +60,23 @@
         </div>
 
         <div class="payment-card">
-          <!-- Pays -->
+          <!-- Mode de paiement -->
           <div class="form-group">
+            <label>Mode de paiement</label>
+            <div class="payment-mode-grid">
+              <div class="payment-mode-card selected" data-mode="mobile" onclick="selectPaymentMode('mobile', this)">
+                <div class="mode-icon">📱</div>
+                <span>Mobile Money</span>
+              </div>
+              <div class="payment-mode-card" data-mode="crypto" onclick="selectPaymentMode('crypto', this)">
+                <div class="mode-icon">₿</div>
+                <span>Cryptomonnaie</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Pays -->
+          <div class="form-group" id="countryGroup">
             <label for="countrySelect">Pays</label>
             <div class="input-wrapper">
               <svg class="input-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -77,16 +92,22 @@
 
           <!-- Réseau Mobile Money -->
           <div class="form-group" id="networkGroup" style="display:none;">
-            <label>Sélectionnez un moyen de paiement</label>
+            <label>Sélectionnez un réseau</label>
             <div class="network-grid" id="networkGrid"></div>
+          </div>
+
+          <!-- Crypto wallets (affiché seulement en mode crypto) -->
+          <div class="form-group" id="cryptoWalletsGroup" style="display:none;">
+            <label>Adresse de dépôt</label>
+            <div class="crypto-grid" id="cryptoGrid"></div>
           </div>
 
           <!-- Numéro de téléphone -->
           <div class="form-group" id="phoneGroup" style="display:none;">
             <label for="phoneInput">Numéro de téléphone à débiter</label>
             <div class="input-wrapper phone-wrapper">
-              <span class="country-flag" id="countryFlag">🇧🇯</span>
-              <span class="country-code" id="countryCode">+229</span>
+              <span class="country-flag" id="countryFlag">🌍</span>
+              <span class="country-code" id="countryCode">+</span>
               <input type="tel" id="phoneInput" placeholder="Ex: 20 21 12 34" maxlength="15">
             </div>
           </div>
@@ -112,6 +133,12 @@
             </div>
           </div>
 
+          <!-- Description (optionnel) -->
+          <div class="form-group" id="descGroup" style="display:none;">
+            <label for="paymentDesc">Description (optionnel)</label>
+            <input type="text" id="paymentDesc" placeholder="Ex: Achat de montre">
+          </div>
+
           <!-- Bouton Payer -->
           <button id="payBtn" class="btn-primary-large" onclick="initiatePayment()" style="display:none;">
             <span id="btnText">Payer maintenant</span>
@@ -120,16 +147,6 @@
 
           <!-- Résultat -->
           <div id="result" class="result-container hidden"></div>
-
-          <!-- Statut en temps réel -->
-          <div id="statusBox" class="status-container hidden">
-            <div class="status-header">
-              <span id="statusBadge" class="status-badge pending">En attente de paiement...</span>
-            </div>
-            <div class="progress-container">
-              <div id="progressBar" class="progress-bar animated"></div>
-            </div>
-          </div>
         </div>
       </div>
     </section>
@@ -152,7 +169,7 @@
           <div class="history-header">
             <span>Date & Heure</span>
             <span>Référence</span>
-            <span>Numéro</span>
+            <span>Numéro/Wallet</span>
             <span>Montant</span>
             <span>Statut</span>
           </div>
@@ -168,10 +185,10 @@
     <div class="container">
       <div class="footer-content">
         <div class="footer-brand">
-          <img src="logo-sk.png" alt="Logo SK" class="footer-logo">
+          <img src="logo-sk.png" alt="Logo SK" class="footer-logo" onerror="this.style.display='none'">
           <div>
             <h3>SOSSOU KOUAMÉ</h3>
-            <p>Paiement Mobile Money</p>
+            <p>Paiement en Ligne</p>
           </div>
         </div>
         <div class="footer-links">
@@ -185,6 +202,7 @@
     </div>
   </footer>
 
+  <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
   <script src="script.js"></script>
 </body>
 </html>

@@ -1,84 +1,425 @@
 // ============================================
-// SOSSOU KOUAMÉ — Paiement Mobile Money
-// Intégration API Money Fusion / FusionPay
+// SOSSOU KOUAMÉ — Paiement en Ligne
+// Intégration Money Fusion / FusionPay
 // ============================================
 
-// ─── CONFIGURATION ───────────────────────────────────────────────────────
-// Remplace cette URL par ton vrai lien API FusionPay (depuis ton dashboard)
-const API_URL = "/api/create-payment";
-const STATUS_URL = "/api/payment-status";
+// ─── CONFIGURATION API MONEY FUSION ──────────────────────────────────────
+// Remplace par ton vrai lien API depuis ton dashboard
+const API_URL = "https://www.pay.moneyfusion.net/Test_de_paiement/pay/";
 
-// Données des pays et réseaux supportés par Money Fusion
+// ─── TOUS LES PAYS DU MONDE AVEC RÉSEAUX MOBILE MONEY ───────────────────
 const COUNTRIES = {
-  "bj": {
-    name: "Bénin",
-    flag: "🇧🇯",
-    code: "+229",
-    currency: "XOF",
+  // Afrique de l'Ouest
+  "bj": { name: "Bénin", flag: "🇧🇯", code: "+229", currency: "XOF",
     networks: [
-      { key: "mtn-bj", name: "MTN", color: "#FFCC00", textColor: "#000" },
-      { key: "moov-bj", name: "Moov", color: "#FF6600", textColor: "#fff" },
-      { key: "celtiis-bj", name: "Celtiis", color: "#00A859", textColor: "#fff" }
+      { key: "mtn", name: "MTN", color: "#FFCC00", textColor: "#000" },
+      { key: "moov", name: "Moov", color: "#FF6600", textColor: "#fff" },
+      { key: "celtiis", name: "Celtiis", color: "#00A859", textColor: "#fff" }
     ]
   },
-  "ci": {
-    name: "Côte d'Ivoire",
-    flag: "🇨🇮",
-    code: "+225",
-    currency: "XOF",
+  "ci": { name: "Côte d'Ivoire", flag: "🇨🇮", code: "+225", currency: "XOF",
     networks: [
-      { key: "mtn-ci", name: "MTN", color: "#FFCC00", textColor: "#000" },
-      { key: "orange-money-ci", name: "Orange", color: "#FF6600", textColor: "#fff" },
-      { key: "moov-ci", name: "Moov", color: "#0066CC", textColor: "#fff" },
-      { key: "wave-ci", name: "Wave", color: "#1CE5BD", textColor: "#000" }
+      { key: "mtn", name: "MTN", color: "#FFCC00", textColor: "#000" },
+      { key: "orange", name: "Orange", color: "#FF6600", textColor: "#fff" },
+      { key: "moov", name: "Moov", color: "#0066CC", textColor: "#fff" },
+      { key: "wave", name: "Wave", color: "#1CE5BD", textColor: "#000" }
     ]
   },
-  "bf": {
-    name: "Burkina Faso",
-    flag: "🇧🇫",
-    code: "+226",
-    currency: "XOF",
+  "bf": { name: "Burkina Faso", flag: "🇧🇫", code: "+226", currency: "XOF",
     networks: [
-      { key: "orange-money-bf", name: "Orange", color: "#FF6600", textColor: "#fff" },
-      { key: "moov-bf", name: "Moov", color: "#0066CC", textColor: "#fff" }
+      { key: "orange", name: "Orange", color: "#FF6600", textColor: "#fff" },
+      { key: "moov", name: "Moov", color: "#0066CC", textColor: "#fff" }
     ]
   },
-  "tg": {
-    name: "Togo",
-    flag: "🇹🇬",
-    code: "+228",
-    currency: "XOF",
+  "tg": { name: "Togo", flag: "🇹🇬", code: "+228", currency: "XOF",
     networks: [
-      { key: "tmoney-tg", name: "T-Money", color: "#0066CC", textColor: "#fff" },
-      { key: "moov-tg", name: "Moov", color: "#FF6600", textColor: "#fff" }
+      { key: "tmoney", name: "T-Money", color: "#0066CC", textColor: "#fff" },
+      { key: "moov", name: "Moov", color: "#FF6600", textColor: "#fff" }
     ]
   },
-  "sn": {
-    name: "Sénégal",
-    flag: "🇸🇳",
-    code: "+221",
-    currency: "XOF",
+  "sn": { name: "Sénégal", flag: "🇸🇳", code: "+221", currency: "XOF",
     networks: [
-      { key: "orange-money-sn", name: "Orange", color: "#FF6600", textColor: "#fff" },
-      { key: "wave-sn", name: "Wave", color: "#1CE5BD", textColor: "#000" }
+      { key: "orange", name: "Orange", color: "#FF6600", textColor: "#fff" },
+      { key: "wave", name: "Wave", color: "#1CE5BD", textColor: "#000" },
+      { key: "free", name: "Free", color: "#DA291C", textColor: "#fff" }
     ]
   },
-  "ml": {
-    name: "Mali",
-    flag: "🇲🇱",
-    code: "+223",
-    currency: "XOF",
+  "ml": { name: "Mali", flag: "🇲🇱", code: "+223", currency: "XOF",
     networks: [
-      { key: "orange-money-ml", name: "Orange", color: "#FF6600", textColor: "#fff" },
-      { key: "moov-ml", name: "Moov", color: "#0066CC", textColor: "#fff" }
+      { key: "orange", name: "Orange", color: "#FF6600", textColor: "#fff" },
+      { key: "moov", name: "Moov", color: "#0066CC", textColor: "#fff" }
+    ]
+  },
+  "gh": { name: "Ghana", flag: "🇬🇭", code: "+233", currency: "GHS",
+    networks: [
+      { key: "mtn", name: "MTN", color: "#FFCC00", textColor: "#000" },
+      { key: "vodafone", name: "Vodafone", color: "#E60000", textColor: "#fff" },
+      { key: "airteltigo", name: "AirtelTigo", color: "#0066CC", textColor: "#fff" }
+    ]
+  },
+  "ng": { name: "Nigeria", flag: "🇳🇬", code: "+234", currency: "NGN",
+    networks: [
+      { key: "mtn", name: "MTN", color: "#FFCC00", textColor: "#000" },
+      { key: "airtel", name: "Airtel", color: "#E60000", textColor: "#fff" },
+      { key: "glo", name: "Glo", color: "#00A859", textColor: "#fff" },
+      { key: "9mobile", name: "9mobile", color: "#0066CC", textColor: "#fff" }
+    ]
+  },
+  "cm": { name: "Cameroun", flag: "🇨🇲", code: "+237", currency: "XAF",
+    networks: [
+      { key: "mtn", name: "MTN", color: "#FFCC00", textColor: "#000" },
+      { key: "orange", name: "Orange", color: "#FF6600", textColor: "#fff" }
+    ]
+  },
+  "ga": { name: "Gabon", flag: "🇬🇦", code: "+241", currency: "XAF",
+    networks: [
+      { key: "airtel", name: "Airtel", color: "#E60000", textColor: "#fff" }
+    ]
+  },
+  "cg": { name: "Congo", flag: "🇨🇬", code: "+242", currency: "XAF",
+    networks: [
+      { key: "airtel", name: "Airtel", color: "#E60000", textColor: "#fff" },
+      { key: "mtn", name: "MTN", color: "#FFCC00", textColor: "#000" }
+    ]
+  },
+  "cd": { name: "RDC", flag: "🇨🇩", code: "+243", currency: "CDF",
+    networks: [
+      { key: "airtel", name: "Airtel", color: "#E60000", textColor: "#fff" },
+      { key: "orange", name: "Orange", color: "#FF6600", textColor: "#fff" },
+      { key: "vodacom", name: "Vodacom", color: "#E60000", textColor: "#fff" }
+    ]
+  },
+  "rw": { name: "Rwanda", flag: "🇷🇼", code: "+250", currency: "RWF",
+    networks: [
+      { key: "mtn", name: "MTN", color: "#FFCC00", textColor: "#000" },
+      { key: "airtel", name: "Airtel", color: "#E60000", textColor: "#fff" }
+    ]
+  },
+  "bi": { name: "Burundi", flag: "🇧🇮", code: "+257", currency: "BIF",
+    networks: [
+      { key: "lumicash", name: "Lumicash", color: "#0066CC", textColor: "#fff" }
+    ]
+  },
+  "tz": { name: "Tanzanie", flag: "🇹🇿", code: "+255", currency: "TZS",
+    networks: [
+      { key: "mpesa", name: "M-Pesa", color: "#00A859", textColor: "#fff" },
+      { key: "tigopesa", name: "Tigo Pesa", color: "#0066CC", textColor: "#fff" },
+      { key: "airtel", name: "Airtel", color: "#E60000", textColor: "#fff" }
+    ]
+  },
+  "ke": { name: "Kenya", flag: "🇰🇪", code: "+254", currency: "KES",
+    networks: [
+      { key: "mpesa", name: "M-Pesa", color: "#00A859", textColor: "#fff" },
+      { key: "airtel", name: "Airtel", color: "#E60000", textColor: "#fff" }
+    ]
+  },
+  "ug": { name: "Ouganda", flag: "🇺🇬", code: "+256", currency: "UGX",
+    networks: [
+      { key: "mtn", name: "MTN", color: "#FFCC00", textColor: "#000" },
+      { key: "airtel", name: "Airtel", color: "#E60000", textColor: "#fff" }
+    ]
+  },
+  "et": { name: "Éthiopie", flag: "🇪🇹", code: "+251", currency: "ETB",
+    networks: [
+      { key: "telebirr", name: "Telebirr", color: "#0066CC", textColor: "#fff" }
+    ]
+  },
+  "za": { name: "Afrique du Sud", flag: "🇿🇦", code: "+27", currency: "ZAR",
+    networks: [
+      { key: "vodapay", name: "Vodapay", color: "#E60000", textColor: "#fff" }
+    ]
+  },
+  "zm": { name: "Zambie", flag: "🇿🇲", code: "+260", currency: "ZMW",
+    networks: [
+      { key: "mtn", name: "MTN", color: "#FFCC00", textColor: "#000" },
+      { key: "airtel", name: "Airtel", color: "#E60000", textColor: "#fff" }
+    ]
+  },
+  "zw": { name: "Zimbabwe", flag: "🇿🇼", code: "+263", currency: "ZWL",
+    networks: [
+      { key: "ecocash", name: "EcoCash", color: "#00A859", textColor: "#fff" }
+    ]
+  },
+  "mz": { name: "Mozambique", flag: "🇲🇿", code: "+258", currency: "MZN",
+    networks: [
+      { key: "mpesa", name: "M-Pesa", color: "#00A859", textColor: "#fff" },
+      { key: "vodacom", name: "Vodacom", color: "#E60000", textColor: "#fff" }
+    ]
+  },
+  "mg": { name: "Madagascar", flag: "🇲🇬", code: "+261", currency: "MGA",
+    networks: [
+      { key: "mvola", name: "MVola", color: "#FF6600", textColor: "#fff" },
+      { key: "airtel", name: "Airtel", color: "#E60000", textColor: "#fff" },
+      { key: "orange", name: "Orange", color: "#FF6600", textColor: "#fff" }
+    ]
+  },
+  // Afrique du Nord
+  "ma": { name: "Maroc", flag: "🇲🇦", code: "+212", currency: "MAD",
+    networks: [
+      { key: "inwi", name: "Inwi", color: "#FF6600", textColor: "#fff" },
+      { key: "orange", name: "Orange", color: "#FF6600", textColor: "#fff" },
+      { key: "iam", name: "IAM", color: "#E60000", textColor: "#fff" }
+    ]
+  },
+  "dz": { name: "Algérie", flag: "🇩🇿", code: "+213", currency: "DZD",
+    networks: [
+      { key: "djezzy", name: "Djezzy", color: "#E60000", textColor: "#fff" },
+      { key: "ooredoo", name: "Ooredoo", color: "#FF6600", textColor: "#fff" }
+    ]
+  },
+  "tn": { name: "Tunisie", flag: "🇹🇳", code: "+216", currency: "TND",
+    networks: [
+      { key: "orange", name: "Orange", color: "#FF6600", textColor: "#fff" },
+      { key: "ooredoo", name: "Ooredoo", color: "#FF6600", textColor: "#fff" }
+    ]
+  },
+  "eg": { name: "Égypte", flag: "🇪🇬", code: "+20", currency: "EGP",
+    networks: [
+      { key: "vodafone", name: "Vodafone", color: "#E60000", textColor: "#fff" },
+      { key: "orange", name: "Orange", color: "#FF6600", textColor: "#fff" },
+      { key: "etisalat", name: "Etisalat", color: "#00A859", textColor: "#fff" },
+      { key: "we", name: "WE", color: "#9B59B6", textColor: "#fff" }
+    ]
+  },
+  "ly": { name: "Libye", flag: "🇱🇾", code: "+218", currency: "LYD",
+    networks: [
+      { key: "madar", name: "Madar", color: "#0066CC", textColor: "#fff" }
+    ]
+  },
+  "sd": { name: "Soudan", flag: "🇸🇩", code: "+249", currency: "SDG",
+    networks: [
+      { key: "zain", name: "Zain", color: "#E60000", textColor: "#fff" },
+      { key: "mtn", name: "MTN", color: "#FFCC00", textColor: "#000" }
+    ]
+  },
+  // Europe
+  "fr": { name: "France", flag: "🇫🇷", code: "+33", currency: "EUR",
+    networks: [
+      { key: "orange", name: "Orange", color: "#FF6600", textColor: "#fff" },
+      { key: "sfr", name: "SFR", color: "#E60000", textColor: "#fff" },
+      { key: "bouygues", name: "Bouygues", color: "#0066CC", textColor: "#fff" },
+      { key: "free", name: "Free", color: "#DA291C", textColor: "#fff" }
+    ]
+  },
+  "gb": { name: "Royaume-Uni", flag: "🇬🇧", code: "+44", currency: "GBP",
+    networks: [
+      { key: "vodafone", name: "Vodafone", color: "#E60000", textColor: "#fff" },
+      { key: "o2", name: "O2", color: "#0066CC", textColor: "#fff" },
+      { key: "three", name: "Three", color: "#00A859", textColor: "#fff" },
+      { key: "ee", name: "EE", color: "#FFCC00", textColor: "#000" }
+    ]
+  },
+  "de": { name: "Allemagne", flag: "🇩🇪", code: "+49", currency: "EUR",
+    networks: [
+      { key: "vodafone", name: "Vodafone", color: "#E60000", textColor: "#fff" },
+      { key: "telekom", name: "Telekom", color: "#E60000", textColor: "#fff" },
+      { key: "o2", name: "O2", color: "#0066CC", textColor: "#fff" }
+    ]
+  },
+  "es": { name: "Espagne", flag: "🇪🇸", code: "+34", currency: "EUR",
+    networks: [
+      { key: "vodafone", name: "Vodafone", color: "#E60000", textColor: "#fff" },
+      { key: "orange", name: "Orange", color: "#FF6600", textColor: "#fff" },
+      { key: "movistar", name: "Movistar", color: "#00A859", textColor: "#fff" }
+    ]
+  },
+  "it": { name: "Italie", flag: "🇮🇹", code: "+39", currency: "EUR",
+    networks: [
+      { key: "vodafone", name: "Vodafone", color: "#E60000", textColor: "#fff" },
+      { key: "tim", name: "TIM", color: "#0066CC", textColor: "#fff" },
+      { key: "windtre", name: "WindTre", color: "#FF6600", textColor: "#fff" }
+    ]
+  },
+  "pt": { name: "Portugal", flag: "🇵🇹", code: "+351", currency: "EUR",
+    networks: [
+      { key: "vodafone", name: "Vodafone", color: "#E60000", textColor: "#fff" },
+      { key: "meo", name: "MEO", color: "#00A859", textColor: "#fff" },
+      { key: "nos", name: "NOS", color: "#FF6600", textColor: "#fff" }
+    ]
+  },
+  "nl": { name: "Pays-Bas", flag: "🇳🇱", code: "+31", currency: "EUR",
+    networks: [
+      { key: "vodafone", name: "Vodafone", color: "#E60000", textColor: "#fff" },
+      { key: "kpn", name: "KPN", color: "#0066CC", textColor: "#fff" },
+      { key: "tmobile", name: "T-Mobile", color: "#E60000", textColor: "#fff" }
+    ]
+  },
+  "be": { name: "Belgique", flag: "🇧🇪", code: "+32", currency: "EUR",
+    networks: [
+      { key: "proximus", name: "Proximus", color: "#0066CC", textColor: "#fff" },
+      { key: "orange", name: "Orange", color: "#FF6600", textColor: "#fff" },
+      { key: "base", name: "Base", color: "#E60000", textColor: "#fff" }
+    ]
+  },
+  "ch": { name: "Suisse", flag: "🇨🇭", code: "+41", currency: "CHF",
+    networks: [
+      { key: "swisscom", name: "Swisscom", color: "#0066CC", textColor: "#fff" },
+      { key: "sunrise", name: "Sunrise", color: "#FF6600", textColor: "#fff" },
+      { key: "salt", name: "Salt", color: "#E60000", textColor: "#fff" }
+    ]
+  },
+  // Amériques
+  "us": { name: "États-Unis", flag: "🇺🇸", code: "+1", currency: "USD",
+    networks: [
+      { key: "venmo", name: "Venmo", color: "#3D95CE", textColor: "#fff" },
+      { key: "cashapp", name: "Cash App", color: "#00D632", textColor: "#000" },
+      { key: "zelle", name: "Zelle", color: "#6B1FA9", textColor: "#fff" }
+    ]
+  },
+  "ca": { name: "Canada", flag: "🇨🇦", code: "+1", currency: "CAD",
+    networks: [
+      { key: "interac", name: "Interac", color: "#FFCC00", textColor: "#000" }
+    ]
+  },
+  "br": { name: "Brésil", flag: "🇧🇷", code: "+55", currency: "BRL",
+    networks: [
+      { key: "pix", name: "PIX", color: "#00A859", textColor: "#fff" },
+      { key: "mercadopago", name: "Mercado Pago", color: "#00A3E0", textColor: "#fff" }
+    ]
+  },
+  "mx": { name: "Mexique", flag: "🇲🇽", code: "+52", currency: "MXN",
+    networks: [
+      { key: "oxxo", name: "OXXO", color: "#FFCC00", textColor: "#000" },
+      { key: "spei", name: "SPEI", color: "#E60000", textColor: "#fff" }
+    ]
+  },
+  "co": { name: "Colombie", flag: "🇨🇴", code: "+57", currency: "COP",
+    networks: [
+      { key: "nequi", name: "Nequi", color: "#FF6600", textColor: "#fff" },
+      { key: "daviplata", name: "Daviplata", color: "#E60000", textColor: "#fff" }
+    ]
+  },
+  "ar": { name: "Argentine", flag: "🇦🇷", code: "+54", currency: "ARS",
+    networks: [
+      { key: "mercadopago", name: "Mercado Pago", color: "#00A3E0", textColor: "#fff" }
+    ]
+  },
+  "cl": { name: "Chili", flag: "🇨🇱", code: "+56", currency: "CLP",
+    networks: [
+      { key: "mercadopago", name: "Mercado Pago", color: "#00A3E0", textColor: "#fff" }
+    ]
+  },
+  "pe": { name: "Pérou", flag: "🇵🇪", code: "+51", currency: "PEN",
+    networks: [
+      { key: "yape", name: "Yape", color: "#6B1FA9", textColor: "#fff" },
+      { key: "plin", name: "Plin", color: "#E60000", textColor: "#fff" }
+    ]
+  },
+  // Asie
+  "cn": { name: "Chine", flag: "🇨🇳", code: "+86", currency: "CNY",
+    networks: [
+      { key: "alipay", name: "Alipay", color: "#1677FF", textColor: "#fff" },
+      { key: "wechat", name: "WeChat Pay", color: "#07C160", textColor: "#fff" }
+    ]
+  },
+  "in": { name: "Inde", flag: "🇮🇳", code: "+91", currency: "INR",
+    networks: [
+      { key: "paytm", name: "Paytm", color: "#00BDF2", textColor: "#fff" },
+      { key: "phonepe", name: "PhonePe", color: "#6B1FA9", textColor: "#fff" },
+      { key: "gpay", name: "Google Pay", color: "#4285F4", textColor: "#fff" },
+      { key: "upi", name: "UPI", color: "#FF6600", textColor: "#fff" }
+    ]
+  },
+  "jp": { name: "Japon", flag: "🇯🇵", code: "+81", currency: "JPY",
+    networks: [
+      { key: "paypay", name: "PayPay", color: "#E60000", textColor: "#fff" },
+      { key: "linepay", name: "LINE Pay", color: "#00B900", textColor: "#fff" }
+    ]
+  },
+  "kr": { name: "Corée du Sud", flag: "🇰🇷", code: "+82", currency: "KRW",
+    networks: [
+      { key: "kakaopay", name: "KakaoPay", color: "#FFCC00", textColor: "#000" },
+      { key: "toss", name: "Toss", color: "#0066CC", textColor: "#fff" }
+    ]
+  },
+  "id": { name: "Indonésie", flag: "🇮🇩", code: "+62", currency: "IDR",
+    networks: [
+      { key: "gopay", name: "GoPay", color: "#00A859", textColor: "#fff" },
+      { key: "ovo", name: "OVO", color: "#6B1FA9", textColor: "#fff" },
+      { key: "dana", name: "DANA", color: "#00A3E0", textColor: "#fff" }
+    ]
+  },
+  "th": { name: "Thaïlande", flag: "🇹🇭", code: "+66", currency: "THB",
+    networks: [
+      { key: "promptpay", name: "PromptPay", color: "#0066CC", textColor: "#fff" },
+      { key: "truemoney", name: "TrueMoney", color: "#E60000", textColor: "#fff" }
+    ]
+  },
+  "vn": { name: "Vietnam", flag: "🇻🇳", code: "+84", currency: "VND",
+    networks: [
+      { key: "momo", name: "MoMo", color: "#E60000", textColor: "#fff" },
+      { key: "zalopay", name: "ZaloPay", color: "#00A3E0", textColor: "#fff" },
+      { key: "viettelpay", name: "ViettelPay", color: "#00A859", textColor: "#fff" }
+    ]
+  },
+  "ph": { name: "Philippines", flag: "🇵🇭", code: "+63", currency: "PHP",
+    networks: [
+      { key: "gcash", name: "GCash", color: "#0066CC", textColor: "#fff" },
+      { key: "maya", name: "Maya", color: "#00A859", textColor: "#fff" },
+      { key: "grabpay", name: "GrabPay", color: "#00B140", textColor: "#fff" }
+    ]
+  },
+  "my": { name: "Malaisie", flag: "🇲🇾", code: "+60", currency: "MYR",
+    networks: [
+      { key: "touchngo", name: "Touch 'n Go", color: "#0066CC", textColor: "#fff" },
+      { key: "grabpay", name: "GrabPay", color: "#00B140", textColor: "#fff" }
+    ]
+  },
+  "sg": { name: "Singapour", flag: "🇸🇬", code: "+65", currency: "SGD",
+    networks: [
+      { key: "paynow", name: "PayNow", color: "#E60000", textColor: "#fff" },
+      { key: "grabpay", name: "GrabPay", color: "#00B140", textColor: "#fff" }
+    ]
+  },
+  // Moyen-Orient
+  "ae": { name: "Émirats Arabes Unis", flag: "🇦🇪", code: "+971", currency: "AED",
+    networks: [
+      { key: "applepay", name: "Apple Pay", color: "#000000", textColor: "#fff" }
+    ]
+  },
+  "sa": { name: "Arabie Saoudite", flag: "🇸🇦", code: "+966", currency: "SAR",
+    networks: [
+      { key: "stcpay", name: "STC Pay", color: "#E60000", textColor: "#fff" },
+      { key: "urpay", name: "Urway", color: "#0066CC", textColor: "#fff" }
+    ]
+  },
+  "qa": { name: "Qatar", flag: "🇶🇦", code: "+974", currency: "QAR",
+    networks: [
+      { key: "ooredoo", name: "Ooredoo", color: "#FF6600", textColor: "#fff" }
+    ]
+  },
+  "kw": { name: "Koweït", flag: "🇰🇼", code: "+965", currency: "KWD",
+    networks: [
+      { key: "knet", name: "KNET", color: "#0066CC", textColor: "#fff" }
+    ]
+  },
+  // Océanie
+  "au": { name: "Australie", flag: "🇦🇺", code: "+61", currency: "AUD",
+    networks: [
+      { key: "paypal", name: "PayPal", color: "#003087", textColor: "#fff" }
+    ]
+  },
+  "nz": { name: "Nouvelle-Zélande", flag: "🇳🇿", code: "+64", currency: "NZD",
+    networks: [
+      { key: "paypal", name: "PayPal", color: "#003087", textColor: "#fff" }
     ]
   }
 };
 
+// ─── CRYPTO WALLETS ──────────────────────────────────────────────────────
+const CRYPTO_WALLETS = [
+  { id: "BTC", name: "Bitcoin", symbol: "BTC", icon: "₿", address: "bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh", min: "0.001 BTC" },
+  { id: "ETH", name: "Ethereum", symbol: "ETH", icon: "Ξ", address: "0x71C7656EC7ab88b098defB751B7401B5f6d8976F", min: "0.01 ETH" },
+  { id: "USDT_TRC20", name: "Tether (TRC20)", symbol: "USDT", icon: "₮", address: "T9zZ123xABCdef456GHIjkl789mnoPQRst", min: "10 USDT" },
+  { id: "USDT_ERC20", name: "Tether (ERC20)", symbol: "USDT", icon: "₮", address: "0x71C7656EC7ab88b098defB751B7401B5f6d8976F", min: "10 USDT" },
+  { id: "BNB", name: "BNB Smart Chain", symbol: "BNB", icon: "B", address: "bnb1xy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh", min: "0.05 BNB" },
+  { id: "SOL", name: "Solana", symbol: "SOL", icon: "S", address: "HN7cABqLq46Es1jh92dQQisAq662SmxELLLsHHe4YWrH", min: "0.5 SOL" }
+];
+
 let selectedCountry = null;
 let selectedNetwork = null;
-let currentToken = null;
-let statusCheckInterval = null;
+let selectedCrypto = null;
+let paymentMode = "mobile";
 
 // ─── INITIALISATION ────────────────────────────────────────────────────────
 document.addEventListener("DOMContentLoaded", () => {
@@ -87,10 +428,9 @@ document.addEventListener("DOMContentLoaded", () => {
   populateCountries();
   loadHistory();
 
-  // Écouteurs pour afficher/masquer les champs
   document.getElementById("countrySelect").addEventListener("change", onCountryChange);
-  document.getElementById("phoneInput").addEventListener("input", onPhoneInput);
-  document.getElementById("amountInput").addEventListener("input", onAmountInput);
+  document.getElementById("phoneInput").addEventListener("input", checkFormComplete);
+  document.getElementById("amountInput").addEventListener("input", checkFormComplete);
   document.getElementById("clientName").addEventListener("input", checkFormComplete);
 });
 
@@ -120,6 +460,34 @@ function initScrollSpy() {
   sections.forEach(sec => observer.observe(sec));
 }
 
+// ─── PAYMENT MODE ──────────────────────────────────────────────────────────
+function selectPaymentMode(mode, element) {
+  paymentMode = mode;
+  document.querySelectorAll('.payment-mode-card').forEach(c => c.classList.remove('selected'));
+  element.classList.add('selected');
+
+  const countryGroup = document.getElementById('countryGroup');
+  const networkGroup = document.getElementById('networkGroup');
+  const phoneGroup = document.getElementById('phoneGroup');
+  const cryptoGroup = document.getElementById('cryptoWalletsGroup');
+
+  if (mode === 'mobile') {
+    countryGroup.style.display = 'block';
+    cryptoGroup.style.display = 'none';
+    if (selectedCountry) {
+      networkGroup.style.display = 'block';
+      phoneGroup.style.display = 'block';
+    }
+  } else {
+    countryGroup.style.display = 'none';
+    networkGroup.style.display = 'none';
+    phoneGroup.style.display = 'none';
+    cryptoGroup.style.display = 'block';
+    renderCryptoWallets();
+  }
+  checkFormComplete();
+}
+
 // ─── PAYS ────────────────────────────────────────────────────────────────
 function populateCountries() {
   const select = document.getElementById("countrySelect");
@@ -136,17 +504,16 @@ function onCountryChange(e) {
   selectedCountry = COUNTRIES[code];
   if (!selectedCountry) return;
 
-  // Met à jour le drapeau et l'indicatif
   document.getElementById("countryFlag").textContent = selectedCountry.flag;
   document.getElementById("countryCode").textContent = selectedCountry.code;
   document.getElementById("currencyLabel").textContent = selectedCountry.currency;
 
-  // Affiche les réseaux
   renderNetworks(selectedCountry.networks);
   document.getElementById("networkGroup").style.display = "block";
   document.getElementById("phoneGroup").style.display = "block";
   document.getElementById("amountGroup").style.display = "block";
   document.getElementById("nameGroup").style.display = "block";
+  document.getElementById("descGroup").style.display = "block";
 
   selectedNetwork = null;
   checkFormComplete();
@@ -177,234 +544,184 @@ function selectNetwork(network, cardElement) {
   checkFormComplete();
 }
 
-function onPhoneInput() {
+// ─── CRYPTO ──────────────────────────────────────────────────────────────
+function renderCryptoWallets() {
+  const grid = document.getElementById("cryptoGrid");
+  grid.innerHTML = "";
+  CRYPTO_WALLETS.forEach(wallet => {
+    const card = document.createElement("div");
+    card.className = "crypto-card";
+    card.dataset.id = wallet.id;
+    card.innerHTML = `
+      <div class="crypto-icon">${wallet.icon}</div>
+      <div class="crypto-info">
+        <div class="crypto-name">${wallet.name}</div>
+        <div class="crypto-symbol">${wallet.symbol}</div>
+        <div class="crypto-address">${wallet.address}</div>
+      </div>
+    `;
+    card.addEventListener("click", () => selectCrypto(wallet, card));
+    grid.appendChild(card);
+  });
+}
+
+function selectCrypto(wallet, cardElement) {
+  selectedCrypto = wallet;
+  document.querySelectorAll(".crypto-card").forEach(c => c.classList.remove("selected"));
+  cardElement.classList.add("selected");
+  document.getElementById("amountGroup").style.display = "block";
+  document.getElementById("nameGroup").style.display = "block";
+  document.getElementById("descGroup").style.display = "block";
   checkFormComplete();
 }
 
-function onAmountInput() {
-  checkFormComplete();
-}
-
+// ─── FORM VALIDATION ─────────────────────────────────────────────────────
 function checkFormComplete() {
-  const phone = document.getElementById("phoneInput").value.trim();
   const amount = document.getElementById("amountInput").value;
   const name = document.getElementById("clientName").value.trim();
   const btn = document.getElementById("payBtn");
 
-  const isComplete = selectedNetwork && phone.length >= 8 && amount && parseInt(amount) >= 100 && name;
+  let isComplete = false;
+
+  if (paymentMode === "mobile") {
+    const phone = document.getElementById("phoneInput").value.trim();
+    isComplete = selectedNetwork && phone.length >= 8 && amount && parseInt(amount) >= 100 && name;
+  } else {
+    isComplete = selectedCrypto && amount && parseFloat(amount) > 0 && name;
+  }
+
   btn.style.display = isComplete ? "flex" : "none";
 }
 
 // ─── PAIEMENT ────────────────────────────────────────────────────────────
-async function initiatePayment() {
+function initiatePayment() {
   const btn = document.getElementById("payBtn");
   const btnText = document.getElementById("btnText");
   const btnLoader = document.getElementById("btnLoader");
   const resultDiv = document.getElementById("result");
-  const statusBox = document.getElementById("statusBox");
 
-  const phone = document.getElementById("phoneInput").value.trim().replace(/\s/g, "");
-  const amount = parseInt(document.getElementById("amountInput").value);
+  const amount = document.getElementById("amountInput").value;
   const name = document.getElementById("clientName").value.trim();
+  const desc = document.getElementById("paymentDesc").value.trim() || "Paiement";
 
-  // Reset UI
   btn.disabled = true;
   btnText.textContent = "Traitement...";
   btnLoader.classList.remove("hidden");
   resultDiv.classList.add("hidden");
-  statusBox.classList.add("hidden");
-  clearInterval(statusCheckInterval);
 
-  const fullPhone = selectedCountry.code + phone;
-
-  const paymentData = {
-    totalPrice: amount,
-    article: [{ "Paiement": amount }],
-    numeroSend: fullPhone,
-    nomclient: name,
-    personal_Info: [{ country: selectedCountry.name, network: selectedNetwork.name, networkKey: selectedNetwork.key }],
-    return_url: window.location.origin + "/callback",
-    webhook_url: window.location.origin + "/webhook"
-  };
-
-  try {
-    const res = await fetch(API_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(paymentData)
-    });
-
-    const data = await res.json();
-
-    if (!data.success && data.statut !== true) {
-      throw new Error(data.error || data.message || "Erreur lors de la création du paiement.");
-    }
-
-    currentToken = data.token || data.tokenPay;
-
-    // Sauvegarde dans l'historique local
-    saveToHistory({
-      token: currentToken,
-      date: new Date().toISOString(),
-      name: name,
-      phone: fullPhone,
-      amount: amount,
-      country: selectedCountry.name,
-      network: selectedNetwork.name,
-      status: "pending"
-    });
-
-    displaySuccess(data, fullPhone, amount, name);
-    startStatusCheck(currentToken);
-    loadHistory();
-
-  } catch (err) {
-    displayError(err.message);
-  } finally {
-    btn.disabled = false;
-    btnText.textContent = "Payer maintenant";
-    btnLoader.classList.add("hidden");
+  if (paymentMode === "mobile") {
+    payMobileMoney(amount, name, desc);
+  } else {
+    payCrypto(amount, name, desc);
   }
 }
 
-function displaySuccess(data, phone, amount, name) {
-  const resultDiv = document.getElementById("result");
-  const token = data.token || data.tokenPay;
-  const paymentUrl = data.paymentUrl || data.url;
+// ─── MOBILE MONEY PAYMENT (comme ton code) ──────────────────────────────
+function payMobileMoney(amount, name, desc) {
+  const phone = document.getElementById("phoneInput").value.trim().replace(/\s/g, "");
+  const fullPhone = selectedCountry.code + phone;
+  const currency = selectedCountry.currency;
 
-  resultDiv.innerHTML = `
-    <div class="result-success">
-      <h4 style="display:flex;align-items:center;gap:8px;margin-bottom:16px;">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
-          <polyline points="22 4 12 14.01 9 11.01"></polyline>
-        </svg>
-        Paiement initié avec succès
-      </h4>
-      <div class="info-grid">
-        <div class="info-item">
-          <span class="info-label">Client</span>
-          <span class="info-value">${name}</span>
-        </div>
-        <div class="info-item">
-          <span class="info-label">Numéro</span>
-          <span class="info-value">${phone}</span>
-        </div>
-        <div class="info-item">
-          <span class="info-label">Montant</span>
-          <span class="info-value">${amount} ${selectedCountry.currency}</span>
-        </div>
-        <div class="info-item">
-          <span class="info-label">Réseau</span>
-          <span class="info-value">${selectedNetwork.name}</span>
-        </div>
-      </div>
-      <p style="margin-top:16px;font-weight:600;color:var(--navy);">Référence (Token) :</p>
-      <div class="token-box" onclick="copyToken(this, '${token}')">${token}</div>
-      <p style="font-size:0.8rem;color:var(--gray-600);text-align:center;">Cliquez pour copier le token</p>
-      ${paymentUrl ? `<a href="${paymentUrl}" target="_blank" rel="noopener" class="btn-primary-large" style="margin-top:16px;text-decoration:none;display:inline-flex;width:100%;">Ouvrir la page de paiement</a>` : ""}
-      <p style="margin-top:16px;font-size:0.85rem;text-align:center;color:var(--gray-600);">
-        Un SMS de confirmation sera envoyé au ${phone}.
-      </p>
-    </div>
-  `;
+  const paymentData = {
+    totalPrice: parseInt(amount),
+    article: [{ [desc]: parseInt(amount) }],
+    numeroSend: fullPhone,
+    nomclient: name,
+    return_url: window.location.origin + "/success.html?amount=" + amount + "&currency=" + currency + "&phone=" + encodeURIComponent(fullPhone) + "&name=" + encodeURIComponent(name) + "&network=" + encodeURIComponent(selectedNetwork.name),
+  };
+
+  axios.post(API_URL, paymentData)
+    .then(res => {
+      const data = res.data;
+      if (data.statut === true || data.success === true) {
+        // Sauvegarde historique
+        saveToHistory({
+          token: data.token || data.tokenPay,
+          date: new Date().toISOString(),
+          name: name,
+          phone: fullPhone,
+          amount: amount,
+          currency: currency,
+          network: selectedNetwork.name,
+          country: selectedCountry.name,
+          status: "pending",
+          mode: "mobile"
+        });
+
+        // Redirection vers la page de paiement Money Fusion (comme ton code)
+        if (data.url) {
+          window.location.href = data.url;
+        } else {
+          showResult("success", "Paiement initié ! Token: " + (data.token || data.tokenPay));
+        }
+      } else {
+        showResult("error", data.message || "Erreur lors du paiement");
+      }
+    })
+    .catch(err => {
+      console.error(err);
+      showResult("error", "Erreur de connexion. Vérifiez votre configuration Money Fusion.");
+    })
+    .finally(() => {
+      resetButton();
+    });
+}
+
+// ─── CRYPTO PAYMENT ──────────────────────────────────────────────────────
+function payCrypto(amount, name, desc) {
+  // Pour crypto, on affiche les instructions
+  showResult("success", `
+    <h4>✅ Paiement Crypto</h4>
+    <p>Envoyez <strong>${amount} ${selectedCrypto.symbol}</strong> à l'adresse :</p>
+    <div class="token-box" onclick="copyToClipboard(this, '${selectedCrypto.address}')">${selectedCrypto.address}</div>
+    <p style="font-size:0.85rem;color:var(--gray-600);">Minimum: ${selectedCrypto.min}</p>
+    <p style="margin-top:12px;">Après le transfert, votre paiement sera validé.</p>
+  `);
+
+  saveToHistory({
+    token: "CRYPTO-" + Date.now(),
+    date: new Date().toISOString(),
+    name: name,
+    phone: selectedCrypto.address,
+    amount: amount,
+    currency: selectedCrypto.symbol,
+    network: selectedCrypto.name,
+    country: "Crypto",
+    status: "pending",
+    mode: "crypto"
+  });
+
+  resetButton();
+}
+
+// ─── UI HELPERS ──────────────────────────────────────────────────────────
+function showResult(type, message) {
+  const resultDiv = document.getElementById("result");
+  resultDiv.className = "result-container result-" + type;
+  resultDiv.innerHTML = message;
   resultDiv.classList.remove("hidden");
 }
 
-function displayError(msg) {
-  const resultDiv = document.getElementById("result");
-  resultDiv.innerHTML = `
-    <div class="result-error">
-      <h4 style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="12" cy="12" r="10"></circle>
-          <line x1="12" y1="8" x2="12" y2="12"></line>
-          <line x1="12" y1="16" x2="12.01" y2="16"></line>
-        </svg>
-        Erreur
-      </h4>
-      <p>${msg}</p>
-    </div>`;
-  resultDiv.classList.remove("hidden");
+function resetButton() {
+  const btn = document.getElementById("payBtn");
+  const btnText = document.getElementById("btnText");
+  const btnLoader = document.getElementById("btnLoader");
+  btn.disabled = false;
+  btnText.textContent = "Payer maintenant";
+  btnLoader.classList.add("hidden");
 }
 
-function copyToken(el, text) {
+function copyToClipboard(el, text) {
   navigator.clipboard.writeText(text).then(() => {
     el.classList.add("copied");
+    const original = el.textContent;
     el.textContent = "Copié !";
-    setTimeout(() => { el.textContent = text; el.classList.remove("copied"); }, 2000);
+    setTimeout(() => { el.textContent = original; el.classList.remove("copied"); }, 2000);
   }).catch(() => {
     const ta = document.createElement("textarea");
     ta.value = text; document.body.appendChild(ta); ta.select();
     document.execCommand("copy"); document.body.removeChild(ta);
-    el.classList.add("copied");
-    el.textContent = "Copié !";
-    setTimeout(() => { el.textContent = text; el.classList.remove("copied"); }, 2000);
   });
-}
-
-// ─── STATUT ──────────────────────────────────────────────────────────────
-const STATUS_MAP = {
-  "pending": { text: "En attente de paiement...", class: "pending" },
-  "no paid": { text: "Paiement non effectué", class: "error" },
-  "failure": { text: "Échec du paiement", class: "error" },
-  "paid": { text: "Paiement réussi !", class: "success" },
-  "completed": { text: "Paiement réussi !", class: "success" }
-};
-
-function updateStatusUI(statusKey) {
-  const statusBox = document.getElementById("statusBox");
-  const statusBadge = document.getElementById("statusBadge");
-  const progressBar = document.getElementById("progressBar");
-
-  const mapped = STATUS_MAP[statusKey] || { text: `Statut: ${statusKey}`, class: "pending" };
-
-  statusBox.classList.remove("hidden");
-  statusBadge.textContent = mapped.text;
-  statusBadge.className = `status-badge ${mapped.class}`;
-
-  if (["paid", "completed", "failure", "no paid"].includes(statusKey)) {
-    progressBar.classList.remove("animated");
-    progressBar.style.width = "100%";
-    progressBar.style.backgroundColor = mapped.class === "success" ? "var(--success)" : "var(--error)";
-    if (mapped.class === "success") triggerConfetti();
-  } else {
-    progressBar.classList.add("animated");
-    progressBar.style.backgroundColor = "transparent";
-  }
-}
-
-function startStatusCheck(token) {
-  if (statusCheckInterval) clearInterval(statusCheckInterval);
-  updateStatusUI("pending");
-  checkStatus(token);
-  statusCheckInterval = setInterval(() => checkStatus(token), 10000);
-  setTimeout(() => {
-    clearInterval(statusCheckInterval);
-    const bar = document.getElementById("progressBar");
-    if (bar) bar.classList.remove("animated");
-  }, 300000);
-}
-
-async function checkStatus(token) {
-  try {
-    const res = await fetch(`${STATUS_URL}/${token}`);
-    const data = await res.json();
-
-    if (data.statut === true && data.data) {
-      const paymentStatus = data.data.statut;
-      updateStatusUI(paymentStatus);
-
-      // Met à jour l'historique
-      updateHistoryStatus(token, paymentStatus);
-
-      if (["paid", "completed", "failure", "no paid"].includes(paymentStatus)) {
-        clearInterval(statusCheckInterval);
-      }
-    }
-  } catch (err) {
-    console.error("Erreur vérification statut:", err);
-  }
 }
 
 // ─── HISTORIQUE ──────────────────────────────────────────────────────────
@@ -412,16 +729,7 @@ function saveToHistory(tx) {
   let history = JSON.parse(localStorage.getItem("sk_payment_history") || "[]");
   history.unshift(tx);
   localStorage.setItem("sk_payment_history", JSON.stringify(history));
-}
-
-function updateHistoryStatus(token, status) {
-  let history = JSON.parse(localStorage.getItem("sk_payment_history") || "[]");
-  const idx = history.findIndex(h => h.token === token);
-  if (idx !== -1) {
-    history[idx].status = status;
-    localStorage.setItem("sk_payment_history", JSON.stringify(history));
-    loadHistory();
-  }
+  loadHistory();
 }
 
 function loadHistory() {
@@ -438,46 +746,16 @@ function loadHistory() {
     const dateStr = date.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric" });
     const timeStr = date.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
     const statusClass = tx.status === "paid" || tx.status === "completed" ? "paid" : tx.status === "pending" ? "pending" : "failed";
-    const statusLabel = STATUS_MAP[tx.status]?.text || tx.status;
+    const statusLabel = tx.status === "paid" || tx.status === "completed" ? "Réussi" : tx.status === "pending" ? "En attente" : "Échoué";
 
     return `
       <div class="history-item">
         <span>${dateStr}<br><small style="color:var(--gray-400)">${timeStr}</small></span>
-        <span style="font-family:monospace;font-size:0.8rem;word-break:break-all;">${tx.token}</span>
-        <span>${tx.phone}</span>
-        <span><strong>${tx.amount} ${tx.country === "Bénin" ? "XOF" : "XOF"}</strong></span>
+        <span style="font-family:monospace;font-size:0.75rem;word-break:break-all;">${tx.token.substring(0, 20)}...</span>
+        <span>${tx.phone.substring(0, 15)}...</span>
+        <span><strong>${tx.amount} ${tx.currency}</strong></span>
         <span><span class="status-dot ${statusClass}"></span>${statusLabel}</span>
       </div>
     `;
   }).join("");
-}
-
-// ─── CONFETTI ────────────────────────────────────────────────────────────
-function triggerConfetti() {
-  const colors = ['#DC2626', '#C9A84C', '#059669', '#2563EB', '#FFFFFF'];
-  for (let i = 0; i < 60; i++) {
-    const confetti = document.createElement('div');
-    const color = colors[Math.floor(Math.random() * colors.length)];
-    const left = Math.random() * 100;
-    const duration = 1.5 + Math.random() * 2;
-    const isCircle = Math.random() > 0.5;
-    confetti.style.cssText = `
-      position: fixed; width: 10px; height: 10px; background: ${color};
-      left: ${left}vw; top: -10px; border-radius: ${isCircle ? '50%' : '0'};
-      animation: fallAnim ${duration}s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
-      z-index: 9999; pointer-events: none; box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-    `;
-    document.body.appendChild(confetti);
-    setTimeout(() => confetti.remove(), duration * 1000);
-  }
-}
-
-if (!document.getElementById('confetti-style')) {
-  const style = document.createElement('style');
-  style.id = 'confetti-style';
-  style.textContent = `@keyframes fallAnim {
-    0% { transform: translateY(-10px) rotate(0deg); opacity: 1; }
-    100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
-  }`;
-  document.head.appendChild(style);
 }
