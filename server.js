@@ -10,15 +10,17 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // ============================================================
-// CONFIGURATION — Remplace par tes vraies infos
+// CONFIGURATION EN DUR (HARDCODED)
 // ============================================================
 const CONFIG = {
-  // URL API de ton application FusionPay (depuis le dashboard)
-  // Ex: https://www.pay.moneyfusion.net/pay/xxxxxxxxxxxxxxxx/pay
-  API_URL: process.env.FUSIONPAY_API_URL || "YOUR_API_URL_HERE",
+  // URL API de création de paiement Money Fusion
+  API_URL: "https://pay.moneyfusion.net/Paiements_m/7da7654df194be93/pay/",
 
   // URL de vérification de statut (fixe)
   STATUS_URL: "https://www.pay.moneyfusion.net/paiementNotif",
+
+  // Clé API Money Fusion (NE JAMAIS PARTAGER PUBLIQUEMENT)
+  API_KEY: "moneyfusion_v1_69777b802181d4ebf71e2bde_9F8AA2BB17ED57E9EE1835A9C1A",
 };
 
 // Middleware
@@ -27,6 +29,24 @@ app.use(express.urlencoded({ extended: true }));
 
 // Servir les fichiers statiques
 app.use(express.static(__dirname));
+
+// ============================================================
+// ROUTE: Récupérer l'IP du serveur (pour Money Fusion whitelist)
+// GET /my-ip
+// ============================================================
+app.get("/my-ip", async (req, res) => {
+  try {
+    const response = await fetch("https://api.ipify.org?format=json");
+    const data = await response.json();
+    res.json({
+      ip: data.ip,
+      message: "Ajoute cette IP dans ton dashboard Money Fusion > Adresses IP autorisées",
+      dashboard_url: "https://pay.moneyfusion.net/dashboard"
+    });
+  } catch (err) {
+    res.status(500).json({ error: "Impossible de récupérer l'IP" });
+  }
+});
 
 // ============================================================
 // ROUTE: Créer un paiement (PAYIN)
@@ -49,12 +69,6 @@ app.post("/api/create-payment", async (req, res) => {
     return res.status(400).json({ error: "Le nom du client est requis" });
   }
 
-  if (!CONFIG.API_URL || CONFIG.API_URL === "YOUR_API_URL_HERE") {
-    return res.status(503).json({
-      error: "L'URL API FusionPay n'est pas configurée. Définis FUSIONPAY_API_URL."
-    });
-  }
-
   try {
     const origin = req.headers.origin || `http://localhost:${PORT}`;
 
@@ -70,7 +84,10 @@ app.post("/api/create-payment", async (req, res) => {
 
     const response = await fetch(CONFIG.API_URL, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${CONFIG.API_KEY}`,
+      },
       body: JSON.stringify(paymentData),
     });
 
@@ -108,7 +125,10 @@ app.get("/api/payment-status/:token", async (req, res) => {
   const { token } = req.params;
   try {
     const response = await fetch(`${CONFIG.STATUS_URL}/${token}`, {
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${CONFIG.API_KEY}`,
+      },
     });
     const data = await response.json();
     res.json(data);
@@ -123,17 +143,30 @@ app.get("/api/payment-status/:token", async (req, res) => {
 // POST /webhook
 // ============================================================
 app.post("/webhook", (req, res) => {
-  const { event, tokenPay, numeroSend, nomclient, numeroTransaction, Montant, frais, moyen, createdAt } = req.body;
+  const {
+    event,
+    tokenPay,
+    numeroSend,
+    nomclient,
+    numeroTransaction,
+    Montant,
+    frais,
+    moyen,
+    createdAt,
+  } = req.body;
 
-  console.log("Webhook reçu:", { event, tokenPay, Montant, nomclient });
+  console.log("Webhook FusionPay reçu:", { event, tokenPay });
 
   if (event === "payin.session.completed") {
-    console.log("PAIEMENT CONFIRME:", { tokenPay, nomclient, Montant, numeroTransaction, moyen });
-    // TODO: Mettre à jour ta BDD, notifier le client...
+    console.log("PAIEMENT CONFIRME:", {
+      tokenPay, nomclient, Montant, frais, numeroSend, numeroTransaction, moyen, createdAt,
+    });
   } else if (event === "payin.session.cancelled") {
     console.log("PAIEMENT ANNULE:", { tokenPay, nomclient, Montant });
   } else if (event === "payin.session.pending") {
     console.log("PAIEMENT EN ATTENTE:", { tokenPay });
+  } else {
+    console.warn("Événement inconnu:", event);
   }
 
   res.status(200).send("OK");
@@ -150,7 +183,7 @@ app.get("/callback", (req, res) => {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Paiement traité</title>
+  <title>Paiement terminé — FusionPay</title>
   <style>
     body { font-family: 'Poppins', system-ui; display: flex; align-items: center; justify-content: center;
            min-height: 100vh; background: linear-gradient(135deg, #0D1B3E, #1E3A5F); margin: 0; }
@@ -183,5 +216,7 @@ app.get("/callback", (req, res) => {
 // ============================================================
 app.listen(PORT, () => {
   console.log(`Serveur lancé sur le port ${PORT}`);
-  console.log(`API URL configurée: ${CONFIG.API_URL !== "YOUR_API_URL_HERE" ? "OUI" : "NON — configure FUSIONPAY_API_URL"}`);
+  console.log(`API URL: ${CONFIG.API_URL}`);
+  console.log(`API Key: ${CONFIG.API_KEY ? "CONFIGURÉE" : "NON CONFIGURÉE"}`);
+  console.log(`Pour récupérer l'IP: http://localhost:${PORT}/my-ip`);
 });
