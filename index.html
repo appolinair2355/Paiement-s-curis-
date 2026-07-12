@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sossou Kouamé — Paiement Mobile Money</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <link rel="icon" href="logo-sk.png">
+</head>
+<body>
+
+  <!-- Navbar -->
+  <nav class="navbar">
+    <div class="nav-container">
+      <a href="#" class="logo-link">
+        <img src="logo-sk.png" alt="Logo SK" class="logo-img">
+        <span class="logo-text">SOSSOU KOUAMÉ</span>
+      </a>
+      <div class="nav-links">
+        <a href="#payer" class="nav-link active">Payer</a>
+        <a href="#historique" class="nav-link">Historique</a>
+      </div>
+      <button class="mobile-menu-btn" aria-label="Menu">
+        <svg viewBox="0 0 24 24" width="28" height="28" stroke="currentColor" stroke-width="2" fill="none">
+          <path d="M3 12h18M3 6h18M3 18h18"></path>
+        </svg>
+      </button>
+    </div>
+  </nav>
+
+  <!-- Mobile Menu -->
+  <div class="mobile-menu">
+    <a href="#payer" class="mobile-nav-link">Payer</a>
+    <a href="#historique" class="mobile-nav-link">Historique</a>
+  </div>
+
+  <main>
+    <!-- Hero -->
+    <section class="hero">
+      <div class="hero-content">
+        <h1 class="hero-title">PAIEMENT MOBILE MONEY</h1>
+        <p class="hero-subtitle">Payez en toute sécurité en Afrique de l'Ouest</p>
+      </div>
+    </section>
+
+    <!-- Paiement Section -->
+    <section id="payer" class="section">
+      <div class="container">
+        <div class="section-header">
+          <div class="section-icon red">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect>
+              <line x1="12" y1="18" x2="12.01" y2="18"></line>
+            </svg>
+          </div>
+          <h2 class="section-title">Effectuer un Paiement</h2>
+        </div>
+
+        <div class="payment-card">
+          <!-- Pays -->
+          <div class="form-group">
+            <label for="countrySelect">Pays</label>
+            <div class="input-wrapper">
+              <svg class="input-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="2" y1="12" x2="22" y2="12"></line>
+                <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+              </svg>
+              <select id="countrySelect">
+                <option value="" disabled selected>Choisir un pays</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Réseau Mobile Money -->
+          <div class="form-group" id="networkGroup" style="display:none;">
+            <label>Sélectionnez un moyen de paiement</label>
+            <div class="network-grid" id="networkGrid"></div>
+          </div>
+
+          <!-- Numéro de téléphone -->
+          <div class="form-group" id="phoneGroup" style="display:none;">
+            <label for="phoneInput">Numéro de téléphone à débiter</label>
+            <div class="input-wrapper phone-wrapper">
+              <span class="country-flag" id="countryFlag">🇧🇯</span>
+              <span class="country-code" id="countryCode">+229</span>
+              <input type="tel" id="phoneInput" placeholder="Ex: 20 21 12 34" maxlength="15">
+            </div>
+          </div>
+
+          <!-- Montant -->
+          <div class="form-group" id="amountGroup" style="display:none;">
+            <label for="amountInput">Montant à payer</label>
+            <div class="input-wrapper amount-wrapper">
+              <input type="number" id="amountInput" placeholder="0" min="100" step="1">
+              <span class="currency" id="currencyLabel">XOF</span>
+            </div>
+          </div>
+
+          <!-- Nom du client -->
+          <div class="form-group" id="nameGroup" style="display:none;">
+            <label for="clientName">Nom du client</label>
+            <div class="input-wrapper">
+              <svg class="input-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                <circle cx="12" cy="7" r="4"></circle>
+              </svg>
+              <input type="text" id="clientName" placeholder="Ex: Jean Dupont">
+            </div>
+          </div>
+
+          <!-- Bouton Payer -->
+          <button id="payBtn" class="btn-primary-large" onclick="initiatePayment()" style="display:none;">
+            <span id="btnText">Payer maintenant</span>
+            <span id="btnLoader" class="loader hidden"></span>
+          </button>
+
+          <!-- Résultat -->
+          <div id="result" class="result-container hidden"></div>
+
+          <!-- Statut en temps réel -->
+          <div id="statusBox" class="status-container hidden">
+            <div class="status-header">
+              <span id="statusBadge" class="status-badge pending">En attente de paiement...</span>
+            </div>
+            <div class="progress-container">
+              <div id="progressBar" class="progress-bar animated"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Historique Section -->
+    <section id="historique" class="section bg-light">
+      <div class="container">
+        <div class="section-header">
+          <div class="section-icon blue">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"></circle>
+              <polyline points="12 6 12 12 16 14"></polyline>
+            </svg>
+          </div>
+          <h2 class="section-title">Historique des Paiements</h2>
+          <p class="section-subtitle">Vos transactions récentes</p>
+        </div>
+
+        <div class="history-card">
+          <div class="history-header">
+            <span>Date & Heure</span>
+            <span>Référence</span>
+            <span>Numéro</span>
+            <span>Montant</span>
+            <span>Statut</span>
+          </div>
+          <div id="historyList" class="history-list">
+            <div class="history-empty">Aucune transaction pour le moment</div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="container">
+      <div class="footer-content">
+        <div class="footer-brand">
+          <img src="logo-sk.png" alt="Logo SK" class="footer-logo">
+          <div>
+            <h3>SOSSOU KOUAMÉ</h3>
+            <p>Paiement Mobile Money</p>
+          </div>
+        </div>
+        <div class="footer-links">
+          <a href="#">Conditions d'utilisation</a>
+          <a href="#">Politique de confidentialité</a>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <p>&copy; 2025 Sossou Kouamé. Tous droits réservés.</p>
+      </div>
+    </div>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>
