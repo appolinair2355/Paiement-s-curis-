@@ -18,7 +18,7 @@ const CONFIG = {
   API_URL: "https://pay.moneyfusion.net/Paiements_m/7da7654df194be93/pay/",
 
   // URL de vérification de statut
-  STATUS_URL: "https://www.pay.moneyfusion.net/paiementNotif",
+  STATUS_URL: "https://pay.moneyfusion.net/paiementNotif",
 
   // Clé API Money Fusion (NE JAMAIS PARTAGER)
   API_KEY: "moneyfusion_v1_69777b802181d4ebf71e2bde_9F8AA2BB17ED57E9EE1835A9C1A",
