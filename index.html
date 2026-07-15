@@ -3,190 +3,140 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Sossou Kouamé — Paiement en Ligne</title>
+  <title>Connexion — Sossou Kouamé</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
-  <link rel="icon" href="logo-sk.png">
 </head>
-<body>
+<body class="login-page">
 
-  <nav class="navbar">
-    <div class="nav-container">
-      <a href="#" class="logo-link">
-        <img src="logo-sk.png" alt="Logo SK" class="logo-img" onerror="this.style.display='none'">
-        <span class="logo-text">SOSSOU KOUAMÉ</span>
-      </a>
-      <div class="nav-links">
-        <a href="#payer" class="nav-link active">Payer</a>
-        <a href="#historique" class="nav-link">Historique</a>
+  <!-- Arrière-plan animé -->
+  <div class="bg-canvas"></div>
+  <div class="grid-overlay"></div>
+  <div class="stars" id="stars"></div>
+
+  <div class="login-wrapper">
+    <div class="login-card">
+
+      <div class="login-brand">
+        <div class="login-icon-wrap">
+          <span class="login-icon">💎</span>
+        </div>
+        <h1>SOSSOU KOUAMÉ</h1>
+        <p>Espace membre sécurisé</p>
       </div>
-      <button class="mobile-menu-btn" aria-label="Menu">
-        <svg viewBox="0 0 24 24" width="28" height="28" stroke="currentColor" stroke-width="2" fill="none">
-          <path d="M3 12h18M3 6h18M3 18h18"></path>
-        </svg>
-      </button>
-    </div>
-  </nav>
 
-  <div class="mobile-menu">
-    <a href="#payer" class="mobile-nav-link">Payer</a>
-    <a href="#historique" class="mobile-nav-link">Historique</a>
+      <form id="loginForm" onsubmit="handleLogin(event)">
+        <div class="login-form">
+          <div class="form-group">
+            <label for="username">Identifiant</label>
+            <div class="input-wrapper">
+              <svg class="input-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+              </svg>
+              <input type="text" id="username" placeholder="Entrez votre identifiant" autocomplete="username" required>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="password">Mot de passe</label>
+            <div class="input-wrapper">
+              <svg class="input-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+              </svg>
+              <input type="password" id="password" placeholder="Entrez votre mot de passe" autocomplete="current-password" required>
+              <button type="button" class="toggle-pwd" onclick="togglePwd()" tabindex="-1">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <div id="loginErr" class="login-error hidden">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+            </svg>
+            <span id="loginErrText"></span>
+          </div>
+
+          <button type="submit" class="btn-login" id="loginBtn" style="margin-top:6px">
+            <span id="loginBtnTxt">Se connecter</span>
+            <span class="btn-loader hidden" id="loginLoad"></span>
+          </button>
+        </div>
+      </form>
+
+      <div class="login-divider"><span>✦ sécurisé par chiffrement ✦</span></div>
+      <p class="login-footer-note">© 2025 Sossou Kouamé — Tous droits réservés</p>
+    </div>
   </div>
 
-  <main>
-    <section class="hero">
-      <div class="hero-content">
-        <h1 class="hero-title">PAIEMENT EN LIGNE</h1>
-        <p class="hero-subtitle">Mobile Money & Crypto — Partout dans le monde</p>
-      </div>
-    </section>
+  <script>
+    // Étoiles
+    (function(){
+      const c = document.getElementById('stars');
+      for(let i=0;i<80;i++){
+        const s = document.createElement('div');
+        s.className = 'star';
+        const sz = Math.random()*2+1;
+        s.style.cssText = `width:${sz}px;height:${sz}px;top:${Math.random()*100}%;left:${Math.random()*100}%;--dur:${2+Math.random()*4}s;--delay:${Math.random()*4}s`;
+        c.appendChild(s);
+      }
+    })();
 
-    <section id="payer" class="section">
-      <div class="container">
-        <div class="section-header">
-          <div class="section-icon red">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect>
-              <line x1="12" y1="18" x2="12.01" y2="18"></line>
-            </svg>
-          </div>
-          <h2 class="section-title">Effectuer un Paiement</h2>
-        </div>
+    // Auth check
+    fetch('/api/me').then(r=>{ if(r.ok) window.location.href='/dashboard.html'; }).catch(()=>{});
 
-        <div class="payment-card">
-          <div class="form-group">
-            <label>Mode de paiement</label>
-            <div class="payment-mode-grid">
-              <div class="payment-mode-card selected" data-mode="mobile" onclick="selectPaymentMode('mobile', this)">
-                <div class="mode-icon">📱</div>
-                <span>Mobile Money</span>
-              </div>
-              <div class="payment-mode-card" data-mode="crypto" onclick="selectPaymentMode('crypto', this)">
-                <div class="mode-icon">₿</div>
-                <span>Cryptomonnaie</span>
-              </div>
-            </div>
-          </div>
+    async function handleLogin(e){
+      e.preventDefault();
+      const btn=document.getElementById('loginBtn');
+      const txt=document.getElementById('loginBtnTxt');
+      const ld =document.getElementById('loginLoad');
+      const err=document.getElementById('loginErr');
+      const etx=document.getElementById('loginErrText');
 
-          <div class="form-group" id="countryGroup">
-            <label for="countrySelect">Pays</label>
-            <div class="input-wrapper">
-              <svg class="input-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <circle cx="12" cy="12" r="10"></circle>
-                <line x1="2" y1="12" x2="22" y2="12"></line>
-                <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
-              </svg>
-              <select id="countrySelect">
-                <option value="" disabled selected>Choisir un pays</option>
-              </select>
-            </div>
-          </div>
+      btn.disabled=true; txt.textContent='Connexion…'; ld.classList.remove('hidden');
+      err.classList.add('hidden');
 
-          <div class="form-group" id="networkGroup" style="display:none;">
-            <label>Sélectionnez un réseau</label>
-            <div class="network-grid" id="networkGrid"></div>
-          </div>
+      try {
+        const r = await fetch('/api/login',{
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({
+            username: document.getElementById('username').value.trim(),
+            password: document.getElementById('password').value
+          })
+        });
+        const d = await r.json();
+        if(r.ok && d.success){
+          txt.textContent='✓ Bienvenue !';
+          setTimeout(()=>window.location.href='/dashboard.html', 400);
+        } else {
+          etx.textContent = d.error || 'Erreur de connexion';
+          err.classList.remove('hidden');
+          btn.disabled=false; txt.textContent='Se connecter'; ld.classList.add('hidden');
+          document.querySelector('.login-card').style.animation='shake .4s ease';
+          setTimeout(()=>document.querySelector('.login-card').style.animation='',500);
+        }
+      } catch {
+        etx.textContent='Erreur réseau. Vérifiez votre connexion.';
+        err.classList.remove('hidden');
+        btn.disabled=false; txt.textContent='Se connecter'; ld.classList.add('hidden');
+      }
+    }
 
-          <div class="form-group" id="cryptoWalletsGroup" style="display:none;">
-            <label>Adresse de dépôt</label>
-            <div class="crypto-grid" id="cryptoGrid"></div>
-          </div>
+    function togglePwd(){
+      const i=document.getElementById('password');
+      i.type = i.type==='password' ? 'text' : 'password';
+    }
+  </script>
 
-          <div class="form-group" id="phoneGroup" style="display:none;">
-            <label for="phoneInput">Numéro de téléphone à débiter</label>
-            <div class="input-wrapper phone-wrapper">
-              <span class="country-flag" id="countryFlag">🌍</span>
-              <span class="country-code" id="countryCode">+</span>
-              <input type="tel" id="phoneInput" placeholder="Ex: 20 21 12 34" maxlength="15">
-            </div>
-          </div>
-
-          <div class="form-group" id="amountGroup" style="display:none;">
-            <label for="amountInput">Montant à payer</label>
-            <div class="input-wrapper amount-wrapper">
-              <input type="number" id="amountInput" placeholder="0" min="100" step="1">
-              <span class="currency" id="currencyLabel">XOF</span>
-            </div>
-          </div>
-
-          <div class="form-group" id="nameGroup" style="display:none;">
-            <label for="clientName">Nom du client</label>
-            <div class="input-wrapper">
-              <svg class="input-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-                <circle cx="12" cy="7" r="4"></circle>
-              </svg>
-              <input type="text" id="clientName" placeholder="Ex: Jean Dupont">
-            </div>
-          </div>
-
-          <div class="form-group" id="descGroup" style="display:none;">
-            <label for="paymentDesc">Description (optionnel)</label>
-            <input type="text" id="paymentDesc" placeholder="Ex: Achat de montre">
-          </div>
-
-          <button id="payBtn" class="btn-primary-large" onclick="initiatePayment()" style="display:none;">
-            <span id="btnText">Payer maintenant</span>
-            <span id="btnLoader" class="loader hidden"></span>
-          </button>
-
-          <div id="result" class="result-container hidden"></div>
-        </div>
-      </div>
-    </section>
-
-    <section id="historique" class="section bg-light">
-      <div class="container">
-        <div class="section-header">
-          <div class="section-icon blue">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <circle cx="12" cy="12" r="10"></circle>
-              <polyline points="12 6 12 12 16 14"></polyline>
-            </svg>
-          </div>
-          <h2 class="section-title">Historique des Paiements</h2>
-          <p class="section-subtitle">Vos transactions récentes</p>
-        </div>
-
-        <div class="history-card">
-          <div class="history-header">
-            <span>Date & Heure</span>
-            <span>Référence</span>
-            <span>Numéro/Wallet</span>
-            <span>Montant</span>
-            <span>Statut</span>
-          </div>
-          <div id="historyList" class="history-list">
-            <div class="history-empty">Aucune transaction pour le moment</div>
-          </div>
-        </div>
-      </div>
-    </section>
-  </main>
-
-  <footer class="footer">
-    <div class="container">
-      <div class="footer-content">
-        <div class="footer-brand">
-          <img src="logo-sk.png" alt="Logo SK" class="footer-logo" onerror="this.style.display='none'">
-          <div>
-            <h3>SOSSOU KOUAMÉ</h3>
-            <p>Paiement en Ligne</p>
-          </div>
-        </div>
-        <div class="footer-links">
-          <a href="#">Conditions d'utilisation</a>
-          <a href="#">Politique de confidentialité</a>
-        </div>
-      </div>
-      <div class="footer-bottom">
-        <p>&copy; 2025 Sossou Kouamé. Tous droits réservés.</p>
-      </div>
-    </div>
-  </footer>
-
-  <script src="script.js"></script>
+  <style>
+    @keyframes shake {
+      0%,100%{transform:translateX(0)}
+      20%,60%{transform:translateX(-6px)}
+      40%,80%{transform:translateX(6px)}
+    }
+  </style>
 </body>
 </html>

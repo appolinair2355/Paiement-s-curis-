@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Paiement — Sossou Kouamé</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="bg-canvas"></div>
+  <div class="grid-overlay"></div>
+  <div class="stars" id="stars"></div>
+
+  <nav class="navbar">
+    <div class="nav-container">
+      <a href="/dashboard.html" class="logo-link">
+        <img src="logo-sk.png" alt="" class="logo-img" onerror="this.style.display='none'">
+        <span class="logo-text">SOSSOU KOUAMÉ</span>
+      </a>
+      <div class="nav-right">
+        <a href="/dashboard.html" class="nav-back">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="15 18 9 12 15 6"/>
+          </svg>
+          Retour
+        </a>
+      </div>
+    </div>
+  </nav>
+
+  <main class="page-main" style="position:relative;z-index:1;">
+    <div class="pay-container">
+
+      <!-- Progress -->
+      <div class="pay-progress" id="progress">
+        <div class="prog-step active" id="ps1">
+          <div class="prog-num">1</div>
+          <span class="prog-label">Plan</span>
+        </div>
+        <div class="prog-line" id="pl1"></div>
+        <div class="prog-step" id="ps2">
+          <div class="prog-num">2</div>
+          <span class="prog-label">Mode</span>
+        </div>
+        <div class="prog-line" id="pl2"></div>
+        <div class="prog-step" id="ps3">
+          <div class="prog-num">3</div>
+          <span class="prog-label">Paiement</span>
+        </div>
+      </div>
+
+      <!-- ÉTAPE 1 : Plans -->
+      <div id="s1" class="pay-step">
+        <h2 class="pay-step-title">Choisissez votre abonnement</h2>
+        <p class="pay-step-sub">Sélectionnez la durée qui vous convient le mieux</p>
+
+        <div class="plans-grid">
+          <div class="plan-card" onclick="selPlan('1j',this)">
+            <div class="plan-emoji">⚡</div>
+            <div class="plan-duration">1 Jour</div>
+            <div class="plan-price"><sup>XOF</sup> 2 000</div>
+            <div class="plan-usd">≈ $3.00 USD</div>
+          </div>
+          <div class="plan-card" onclick="selPlan('7j',this)">
+            <div class="plan-popular">⭐ Populaire</div>
+            <div class="plan-emoji">🚀</div>
+            <div class="plan-duration">7 Jours</div>
+            <div class="plan-price"><sup>XOF</sup> 10 000</div>
+            <div class="plan-usd">≈ $16.00 USD</div>
+          </div>
+          <div class="plan-card" onclick="selPlan('30j',this)">
+            <div class="plan-emoji">👑</div>
+            <div class="plan-duration">30 Jours</div>
+            <div class="plan-price"><sup>XOF</sup> 30 000</div>
+            <div class="plan-usd">≈ $50.00 USD</div>
+          </div>
+        </div>
+
+        <button class="btn-primary" id="btnS1" onclick="goStep(2)" disabled>
+          Continuer
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <polyline points="9 18 15 12 9 6"/>
+          </svg>
+        </button>
+      </div>
+
+      <!-- ÉTAPE 2 : Méthode -->
+      <div id="s2" class="pay-step hidden">
+        <h2 class="pay-step-title">Mode de paiement</h2>
+        <p class="pay-step-sub" id="s2sub">—</p>
+
+        <div class="method-grid">
+          <div class="method-card" id="mMobile" onclick="selMethod('mobile')">
+            <div class="method-emoji">📱</div>
+            <div class="method-name">Mobile Money</div>
+            <div class="method-desc">MTN · Orange · Wave · Moov</div>
+          </div>
+          <div class="method-card" id="mCrypto" onclick="selMethod('crypto')">
+            <div class="method-emoji">₿</div>
+            <div class="method-name">Cryptomonnaie</div>
+            <div class="method-desc">USDT · BTC · ETH…</div>
+          </div>
+        </div>
+
+        <button class="btn-primary" id="btnS2" onclick="goStep(3)" disabled>
+          Continuer
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <polyline points="9 18 15 12 9 6"/>
+          </svg>
+        </button>
+        <button class="btn-ghost" onclick="goStep(1)">← Retour</button>
+      </div>
+
+      <!-- ÉTAPE 3A : Mobile Money -->
+      <div id="s3m" class="pay-step hidden">
+        <h2 class="pay-step-title">Paiement Mobile Money</h2>
+        <p class="pay-step-sub" id="s3msub">—</p>
+
+        <div class="glass-gold" style="padding:28px; margin-bottom:8px;">
+          <div class="form-section">
+            <label class="form-label">Pays</label>
+            <div class="input-wrapper">
+              <svg class="input-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/>
+                <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+              </svg>
+              <select id="countrySelect" onchange="onCountry()">
+                <option value="" disabled selected>Sélectionner un pays</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-section" id="netGrp" style="display:none">
+            <label class="form-label">Réseau</label>
+            <div class="network-chips" id="netChips"></div>
+          </div>
+
+          <div class="form-section" id="phoneGrp" style="display:none">
+            <label class="form-label">Numéro à débiter</label>
+            <div class="input-wrapper phone-row">
+              <div class="phone-prefix" id="phonePrefix">
+                <span id="pFlag">🌍</span>
+                <span id="pCode">+</span>
+              </div>
+              <input type="tel" id="phoneInput" placeholder="Ex: 20 21 12 34" maxlength="15" oninput="chkMobile()">
+            </div>
+          </div>
+
+          <div class="form-section" id="nameGrp" style="display:none">
+            <label class="form-label">Nom complet</label>
+            <div class="input-wrapper">
+              <svg class="input-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+              </svg>
+              <input type="text" id="clientName" placeholder="Ex: Jean Dupont" oninput="chkMobile()">
+            </div>
+          </div>
+
+          <div id="mErr" class="btn-pay-error hidden">
+            <span>⚠</span><span id="mErrTxt"></span>
+          </div>
+
+          <button class="btn-primary" id="btnPayM" onclick="payMobile()" style="display:none;margin-top:4px">
+            <span id="btnMTxt">💳 Payer maintenant</span>
+            <span class="btn-loader hidden" id="mLoad"></span>
+          </button>
+        </div>
+
+        <button class="btn-ghost" onclick="goStep(2)">← Retour</button>
+      </div>
+
+      <!-- ÉTAPE 3B : Crypto -->
+      <div id="s3c" class="pay-step hidden">
+        <h2 class="pay-step-title">Paiement Crypto</h2>
+        <p class="pay-step-sub" id="s3csub">—</p>
+
+        <div class="glass-gold" style="padding:28px; margin-bottom:8px;">
+          <div class="crypto-note">
+            <span class="crypto-note-icon">💡</span>
+            Choisissez une crypto, envoyez le montant exact à l'adresse indiquée, puis confirmez avec votre hash de transaction.
+          </div>
+
+          <div class="form-section">
+            <label class="form-label">Cryptomonnaie</label>
+            <div class="crypto-chips" id="cryptoChips"></div>
+          </div>
+
+          <div id="addrBlock" style="display:none">
+            <div class="address-reveal">
+              <div class="addr-top">
+                <span class="addr-title" id="addrTitle"></span>
+                <span class="addr-net-tag" id="addrNet"></span>
+              </div>
+              <div class="addr-value" id="addrVal"></div>
+              <div class="addr-actions">
+                <button class="btn-copy" id="btnCopy" onclick="copyAddr()">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                  </svg>
+                  Copier l'adresse
+                </button>
+                <span class="addr-min">Min : <strong id="addrMin"></strong></span>
+              </div>
+            </div>
+
+            <div class="form-section" style="margin-top:18px">
+              <label class="form-label">Hash de transaction (optionnel)</label>
+              <div class="input-wrapper">
+                <input type="text" id="txHash" placeholder="Ex: 0xabc123def456…" style="padding-left:14px">
+              </div>
+              <p class="field-hint">Renseignez votre hash pour accélérer la validation de votre abonnement.</p>
+            </div>
+
+            <div id="cErr" class="btn-pay-error hidden">
+              <span>⚠</span><span id="cErrTxt"></span>
+            </div>
+
+            <button class="btn-primary" onclick="payCrypto()" style="margin-top:4px">
+              ✓ Confirmer l'envoi
+            </button>
+          </div>
+        </div>
+
+        <button class="btn-ghost" onclick="goStep(2)">← Retour</button>
+      </div>
+
+    </div>
+  </main>
+
+  <script>
+    // Étoiles
+    (function(){
+      const c=document.getElementById('stars');
+      for(let i=0;i<50;i++){
+        const s=document.createElement('div');s.className='star';
+        const sz=Math.random()*1.5+.5;
+        s.style.cssText=`width:${sz}px;height:${sz}px;top:${Math.random()*100}%;left:${Math.random()*100}%;--dur:${2+Math.random()*4}s;--delay:${Math.random()*5}s`;
+        c.appendChild(s);
+      }
+    })();
+
+    const PLANS={
+      '1j':{label:'1 Jour',price:2000,usd:3.00,minutes:1440},
+      '7j':{label:'7 Jours',price:10000,usd:16.00,minutes:10080},
+      '30j':{label:'30 Jours',price:30000,usd:50.00,minutes:43200}
+    };
+    const COUNTRIES={
+      bj:{name:'Bénin',flag:'🇧🇯',code:'+229',nets:[{k:'mtn',n:'MTN',c:'#FFCC00'},{k:'moov',n:'Moov',c:'#FF6600'},{k:'celtiis',n:'Celtiis',c:'#00A859'}]},
+      ci:{name:"Côte d'Ivoire",flag:'🇨🇮',code:'+225',nets:[{k:'mtn',n:'MTN',c:'#FFCC00'},{k:'orange',n:'Orange',c:'#FF6600'},{k:'moov',n:'Moov',c:'#0066CC'},{k:'wave',n:'Wave',c:'#1CE5BD'}]},
+      bf:{name:'Burkina Faso',flag:'🇧🇫',code:'+226',nets:[{k:'orange',n:'Orange',c:'#FF6600'},{k:'moov',n:'Moov',c:'#0066CC'}]},
+      tg:{name:'Togo',flag:'🇹🇬',code:'+228',nets:[{k:'tmoney',n:'T-Money',c:'#0066CC'},{k:'moov',n:'Moov',c:'#FF6600'}]},
+      sn:{name:'Sénégal',flag:'🇸🇳',code:'+221',nets:[{k:'orange',n:'Orange',c:'#FF6600'},{k:'wave',n:'Wave',c:'#1CE5BD'},{k:'free',n:'Free',c:'#DA291C'}]},
+      ml:{name:'Mali',flag:'🇲🇱',code:'+223',nets:[{k:'orange',n:'Orange',c:'#FF6600'},{k:'moov',n:'Moov',c:'#0066CC'}]},
+      gh:{name:'Ghana',flag:'🇬🇭',code:'+233',nets:[{k:'mtn',n:'MTN',c:'#FFCC00'},{k:'vodafone',n:'Vodafone',c:'#E60000'}]},
+      ng:{name:'Nigeria',flag:'🇳🇬',code:'+234',nets:[{k:'mtn',n:'MTN',c:'#FFCC00'},{k:'airtel',n:'Airtel',c:'#E60000'}]},
+      cm:{name:'Cameroun',flag:'🇨🇲',code:'+237',nets:[{k:'mtn',n:'MTN',c:'#FFCC00'},{k:'orange',n:'Orange',c:'#FF6600'}]},
+      fr:{name:'France',flag:'🇫🇷',code:'+33',nets:[{k:'orange',n:'Orange',c:'#FF6600'},{k:'sfr',n:'SFR',c:'#E60000'}]},
+    };
+    const CRYPTOS=[
+      {id:'USDT_TRC20',name:'Tether TRC20',sym:'USDT',icon:'₮',net:'TRON',addr:'T9zZ123xABCdef456GHIjkl789mnoPQRst',min:'10 USDT'},
+      {id:'USDT_ERC20',name:'Tether ERC20',sym:'USDT',icon:'₮',net:'ETH',addr:'0x71C7656EC7ab88b098defB751B7401B5f6d8976F',min:'10 USDT'},
+      {id:'BTC',name:'Bitcoin',sym:'BTC',icon:'₿',net:'BTC',addr:'bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh',min:'0.001 BTC'},
+      {id:'ETH',name:'Ethereum',sym:'ETH',icon:'Ξ',net:'ETH',addr:'0x71C7656EC7ab88b098defB751B7401B5f6d8976F',min:'0.01 ETH'},
+    ];
+
+    let selPlanId=null, selMethod_=null, selCountry=null, selNet=null, selCrypto=null;
+
+    // Auth check
+    fetch('/api/me').then(r=>{if(r.status===401) window.location.href='/';}).catch(()=>{});
+
+    // ─── Step navigation ───────────────────────────────────────────────
+    function goStep(n){
+      [1,2,3].forEach(i=>{
+        document.getElementById('s'+i+'m') && (document.getElementById('s'+i+'m').classList.add('hidden'));
+        document.getElementById('s'+i+'c') && (document.getElementById('s'+i+'c').classList.add('hidden'));
+        document.getElementById('s'+i) && document.getElementById('s'+i).classList.add('hidden');
+      });
+      // progress
+      ['ps1','ps2','ps3'].forEach((id,i)=>{
+        const el=document.getElementById(id);
+        el.className='prog-step'+(n>i+1?' done':n===i+1?' active':'');
+        if(i<2) document.getElementById('pl'+(i+1)).className='prog-line'+(n>i+1?' done':'');
+      });
+
+      if(n===1){ document.getElementById('s1').classList.remove('hidden'); }
+      else if(n===2){ document.getElementById('s2').classList.remove('hidden'); initS2(); }
+      else if(n===3 && selMethod_==='mobile'){ document.getElementById('s3m').classList.remove('hidden'); initS3m(); }
+      else if(n===3 && selMethod_==='crypto'){ document.getElementById('s3c').classList.remove('hidden'); initS3c(); }
+    }
+
+    // ─── ÉTAPE 1 ──────────────────────────────────────────────────────
+    function selPlan(id,el){
+      selPlanId=id;
+      document.querySelectorAll('.plan-card').forEach(c=>c.classList.remove('selected'));
+      el.classList.add('selected');
+      document.getElementById('btnS1').disabled=false;
+    }
+
+    // ─── ÉTAPE 2 ──────────────────────────────────────────────────────
+    function initS2(){
+      const p=PLANS[selPlanId];
+      document.getElementById('s2sub').textContent=`${p.label} — ${p.price.toLocaleString('fr-FR')} XOF`;
+    }
+    function selMethod(m){
+      selMethod_=m;
+      document.getElementById('mMobile').classList.toggle('selected',m==='mobile');
+      document.getElementById('mCrypto').classList.toggle('selected',m==='crypto');
+      document.getElementById('btnS2').disabled=false;
+    }
+
+    // ─── ÉTAPE 3A : Mobile Money ──────────────────────────────────────
+    function initS3m(){
+      const p=PLANS[selPlanId];
+      document.getElementById('s3msub').textContent=`${p.label} — ${p.price.toLocaleString('fr-FR')} XOF`;
+      selCountry=null; selNet=null;
+      // Pays
+      const sel=document.getElementById('countrySelect');
+      sel.innerHTML='<option value="" disabled selected>Sélectionner un pays</option>';
+      Object.entries(COUNTRIES).forEach(([k,v])=>{
+        const o=document.createElement('option');
+        o.value=k; o.textContent=`${v.flag} ${v.name}`; sel.appendChild(o);
+      });
+      ['netGrp','phoneGrp','nameGrp'].forEach(id=>document.getElementById(id).style.display='none');
+      document.getElementById('btnPayM').style.display='none';
+    }
+    function onCountry(){
+      const k=document.getElementById('countrySelect').value;
+      selCountry=COUNTRIES[k]; selNet=null;
+      if(!selCountry) return;
+      document.getElementById('pFlag').textContent=selCountry.flag;
+      document.getElementById('pCode').textContent=selCountry.code;
+      renderNets(selCountry.nets);
+      document.getElementById('netGrp').style.display='block';
+      document.getElementById('phoneGrp').style.display='block';
+      document.getElementById('nameGrp').style.display='block';
+      chkMobile();
+    }
+    function renderNets(nets){
+      const box=document.getElementById('netChips'); box.innerHTML='';
+      nets.forEach(net=>{
+        const d=document.createElement('div'); d.className='network-chip';
+        d.innerHTML=`<span class="net-dot" style="background:${net.c}"></span>${net.n}`;
+        d.onclick=()=>{
+          selNet=net;
+          document.querySelectorAll('.network-chip').forEach(c=>c.classList.remove('selected'));
+          d.classList.add('selected'); chkMobile();
+        };
+        box.appendChild(d);
+      });
+    }
+    function chkMobile(){
+      const phone=(document.getElementById('phoneInput').value||'').trim();
+      const name=(document.getElementById('clientName').value||'').trim();
+      const ok=selNet && phone.length>=8 && name.length>0;
+      document.getElementById('btnPayM').style.display=ok?'flex':'none';
+    }
+    async function payMobile(){
+      const btn=document.getElementById('btnPayM');
+      const txt=document.getElementById('btnMTxt');
+      const ld =document.getElementById('mLoad');
+      const err=document.getElementById('mErr');
+      const etx=document.getElementById('mErrTxt');
+      btn.disabled=true; txt.textContent='Traitement…'; ld.classList.remove('hidden');
+      err.classList.add('hidden');
+      const phone=document.getElementById('phoneInput').value.trim().replace(/\s/g,'');
+      const name=document.getElementById('clientName').value.trim();
+      const p=PLANS[selPlanId];
+      try {
+        const r=await fetch('/api/create-payment',{
+          method:'POST',headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({
+            totalPrice:p.price,
+            article:[{Abonnement:p.price}],
+            numeroSend:selCountry.code+phone,
+            nomclient:name,
+            plan_id:selPlanId
+          })
+        });
+        const d=await r.json();
+        if(d.url){ window.location.href=d.url; return; }
+        if(d.statut===true||d.success===true){
+          window.location.href=`/success.html?req=${d.payment_req_id}&method=mobile`;
+        } else {
+          etx.textContent=d.message||d.error||'Erreur lors du paiement';
+          err.classList.remove('hidden');
+          btn.disabled=false; txt.textContent='💳 Payer maintenant'; ld.classList.add('hidden');
+        }
+      } catch {
+        etx.textContent='Erreur réseau. Réessayez.';
+        err.classList.remove('hidden');
+        btn.disabled=false; txt.textContent='💳 Payer maintenant'; ld.classList.add('hidden');
+      }
+    }
+
+    // ─── ÉTAPE 3B : Crypto ────────────────────────────────────────────
+    function initS3c(){
+      const p=PLANS[selPlanId];
+      document.getElementById('s3csub').textContent=`${p.label} — $${p.usd.toFixed(2)} USD`;
+      selCrypto=null;
+      const box=document.getElementById('cryptoChips'); box.innerHTML='';
+      CRYPTOS.forEach(w=>{
+        const d=document.createElement('div'); d.className='crypto-chip';
+        d.innerHTML=`<div class="crypto-sym-badge">${w.icon}</div><div><div class="crypto-chip-name">${w.name}</div><div class="crypto-chip-sym">${w.sym} · ${w.net}</div></div>`;
+        d.onclick=()=>{
+          selCrypto=w;
+          document.querySelectorAll('.crypto-chip').forEach(c=>c.classList.remove('selected'));
+          d.classList.add('selected'); showAddr(w);
+        };
+        box.appendChild(d);
+      });
+      document.getElementById('addrBlock').style.display='none';
+    }
+    function showAddr(w){
+      document.getElementById('addrTitle').textContent=w.name;
+      document.getElementById('addrNet').textContent=w.net;
+      document.getElementById('addrVal').textContent=w.addr;
+      document.getElementById('addrMin').textContent=w.min;
+      document.getElementById('addrBlock').style.display='block';
+      document.getElementById('btnCopy').textContent=''; // reset
+      document.getElementById('btnCopy').innerHTML=`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copier l'adresse`;
+      document.getElementById('btnCopy').className='btn-copy';
+    }
+    function copyAddr(){
+      if(!selCrypto) return;
+      navigator.clipboard.writeText(selCrypto.addr);
+      const b=document.getElementById('btnCopy');
+      b.innerHTML='✓ Copié !'; b.className='btn-copy copied';
+      setTimeout(()=>{
+        b.innerHTML=`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copier l'adresse`;
+        b.className='btn-copy';
+      },2500);
+    }
+    async function payCrypto(){
+      const err=document.getElementById('cErr');
+      const etx=document.getElementById('cErrTxt');
+      err.classList.add('hidden');
+      if(!selCrypto){ etx.textContent='Veuillez choisir une cryptomonnaie'; err.classList.remove('hidden'); return; }
+      const tx=document.getElementById('txHash').value.trim();
+      try {
+        const r=await fetch('/api/create-payment-crypto',{
+          method:'POST',headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({plan_id:selPlanId,crypto_id:selCrypto.id,transaction_hash:tx})
+        });
+        const d=await r.json();
+        if(d.success) window.location.href=`/success.html?req=${d.payment_req_id}&method=crypto`;
+        else { etx.textContent=d.error||'Erreur'; err.classList.remove('hidden'); }
+      } catch { etx.textContent='Erreur réseau.'; err.classList.remove('hidden'); }
+    }
+  </script>
+</body>
+</html>
