@@ -32,7 +32,7 @@
         <p>Vérification du paiement en cours…</p>
       </div>
 
-      <!-- Succès -->
+      <!-- Succès abonnement -->
       <div id="suc" class="result-card success-card hidden">
         <div class="result-icon-wrap success">🎉</div>
         <h2>Paiement confirmé !</h2>
@@ -40,6 +40,20 @@
         <div class="result-details" id="sucDetails"></div>
         <a href="/dashboard.html" class="btn-primary" style="text-decoration:none">
           Voir mon abonnement →
+        </a>
+      </div>
+
+      <!-- Succès achat stratégie -->
+      <div id="sucIdea" class="result-card success-card hidden">
+        <div class="result-icon-wrap success">🎉</div>
+        <h2>Achat confirmé !</h2>
+        <p class="result-sub" id="sucIdeaSub"></p>
+        <div class="result-details" style="margin:16px 0">
+          <div class="result-row"><span>Statut</span><strong class="ok">✓ Validé</strong></div>
+          <div class="result-row" style="margin-top:10px"><span style="color:rgba(255,255,255,0.7);font-size:.88rem;line-height:1.6">Retournez sur le site principal pour télécharger votre stratégie. Votre achat a été enregistré et sera disponible dans votre espace.</span></div>
+        </div>
+        <a href="/dashboard.html" class="btn-primary" style="text-decoration:none;margin-bottom:10px">
+          Tableau de bord →
         </a>
       </div>
 
@@ -131,6 +145,7 @@
     const params=new URLSearchParams(location.search);
     const reqId=params.get('req');
     const method=params.get('method');
+    const itemType=params.get('type'); // 'idea' or null
     let retries=0;
 
     async function check(){
@@ -162,6 +177,14 @@
     }
 
     function showSuccess(d){
+      // Achat stratégie / idée
+      if(d.item_type==='item' || itemType==='item' || d.item_type==='idea' || itemType==='idea'){
+        document.getElementById('sucIdeaSub').textContent=`"${d.plan_label||'Stratégie'}" a été acheté avec succès.`;
+        document.getElementById('sucIdea').classList.remove('hidden');
+        launchConfetti();
+        return;
+      }
+      // Abonnement
       const plan=d.plan_label||'Abonnement';
       const mins=d.duration_minutes||0;
       const days=Math.floor(mins/1440), hrs=Math.floor((mins%1440)/60);

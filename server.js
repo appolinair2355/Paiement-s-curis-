@@ -40,6 +40,36 @@ const CRYPTO_WALLETS = [
   { id: "ETH",        name: "Ethereum",     symbol: "ETH",  icon: "Ξ", network: "Ethereum", address: "0x71C7656EC7ab88b098defB751B7401B5f6d8976F", min: "0.01 ETH" },
 ];
 
+// ─── TAUX DE CHANGE TEMPS RÉEL (cache 1h) ────────────────────────────────
+let _rateCache = { data: null, ts: 0 };
+async function getExchangeRates() {
+  const now = Date.now();
+  if (_rateCache.data && now - _rateCache.ts < 3_600_000) return _rateCache.data;
+  try {
+    const [fiatRes, cryptoRes] = await Promise.all([
+      fetch("https://open.er-api.com/v6/latest/USD"),
+      fetch("https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum&vs_currencies=usd"),
+    ]);
+    const fiat   = await fiatRes.json();
+    const crypto = await cryptoRes.json();
+    const data = {
+      usd_to_xof: Math.round(fiat.rates?.XOF  || 656),
+      usd_to_eur: parseFloat((fiat.rates?.EUR  || 0.93).toFixed(4)),
+      btc_usd:    Math.round(crypto.bitcoin?.usd  || 60000),
+      eth_usd:    Math.round(crypto.ethereum?.usd || 3000),
+      updated_at: new Date().toISOString(),
+    };
+    _rateCache = { data, ts: now };
+    console.log("[RATES]", JSON.stringify(data));
+    return data;
+  } catch (e) {
+    console.error("[RATES-ERR]", e.message);
+    const fallback = { usd_to_xof: 656, usd_to_eur: 0.93, btc_usd: 60000, eth_usd: 3000 };
+    if (!_rateCache.data) _rateCache = { data: fallback, ts: now - 3_500_000 };
+    return _rateCache.data;
+  }
+}
+
 // ─── MIDDLEWARE ───────────────────────────────────────────────────────────
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -117,7 +147,7 @@ app.get("/api/me", requireAuth, async (req, res) => {
   try {
     const result = await pool.query(
       `SELECT id, username, first_name, last_name, is_premium, is_pro,
-              subscription_expires_at, subscription_duration_minutes, account_type
+              subscription_expires_at, subscription_duration_minutes, account_type, is_admin
        FROM users WHERE id = $1`,
       [req.session.userId]
     );
@@ -140,21 +170,156 @@ app.get("/api/me", requireAuth, async (req, res) => {
   }
 });
 
+// ─── ROUTE: Taux de change ────────────────────────────────────────────────
+app.get("/api/rates", requireAuth, async (req, res) => {
+  res.json(await getExchangeRates());
+});
+
 // ─── ROUTE: Plans ─────────────────────────────────────────────────────────
 app.get("/api/plans", (req, res) => {
   res.json({ plans: PLANS, crypto_wallets: CRYPTO_WALLETS });
 });
 
+// ─── ROUTE: Boutique (stratégies depuis settings + idées depuis DB) ──────
+app.get("/api/shop", requireAuth, async (req, res) => {
+  try {
+    const items = [];
+
+    // 1. Stratégies depuis settings.strategy_shop_desc ──────────────
+    const settRes = await pool.query(
+      "SELECT value FROM settings WHERE key = 'strategy_shop_desc'"
+    );
+    if (settRes.rows.length > 0) {
+      try {
+        const shopDesc = JSON.parse(settRes.rows[0].value);
+        let sortIdx = 1;
+        for (const [id, stats] of Object.entries(shopDesc)) {
+          // Prix selon catégorie (Combo = C, Standard = S)
+          const price_xof = id.startsWith("C") ? 15000 : 10000;
+          const price_usd = parseFloat((price_xof / 650).toFixed(2));
+          items.push({
+            id:          `strat_${id}`,
+            name:        `Stratégie ${id}`,
+            description: `Taux de victoire : ${stats.winRate}% — ${stats.total} parties (${stats.wins}W / ${stats.losses}L)`,
+            price_xof,
+            price_usd,
+            winRate:     stats.winRate,
+            is_paid:     true,
+            category:    "strategy",
+            sort_order:  sortIdx++,
+          });
+        }
+      } catch (e) { console.error("[SHOP-PARSE]", e.message); }
+    }
+
+    // 2. Idées de stratégie depuis strategy_ideas ───────────────────
+    const ideasRes = await pool.query(
+      `SELECT id, name, description, is_paid, price_usd, sort_order
+       FROM strategy_ideas WHERE enabled = true
+       ORDER BY sort_order ASC NULLS LAST, id ASC`
+    );
+    for (const row of ideasRes.rows) {
+      items.push({
+        ...row,
+        id:       `idea_${row.id}`,
+        price_xof: Math.round((row.price_usd || 0) * 650),
+        category: "idea",
+      });
+    }
+
+    res.json({ items });
+  } catch (err) {
+    console.error("[SHOP]", err);
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
+
+// ─── ROUTE: Acheter un article de la boutique (stratégie ou idée) ─────────
+app.post("/api/buy-item", requireAuth, async (req, res) => {
+  const { item_id, item_name, price_xof, numeroSend } = req.body;
+
+  if (!item_id)   return res.status(400).json({ error: "Produit requis" });
+  if (!item_name) return res.status(400).json({ error: "Nom du produit requis" });
+  if (!price_xof || Number(price_xof) <= 0)
+    return res.status(400).json({ error: "Prix invalide" });
+  if (!numeroSend || String(numeroSend).trim().length < 8)
+    return res.status(400).json({ error: "Numéro de téléphone requis (min 8 chiffres)" });
+
+  try {
+    // Nom du client depuis la BDD
+    const userRes = await pool.query(
+      "SELECT first_name, last_name, username FROM users WHERE id = $1",
+      [req.session.userId]
+    );
+    const u = userRes.rows[0];
+    const nomclient = [u.first_name, u.last_name].filter(Boolean).join(" ") || u.username;
+
+    const price_usd = parseFloat((Number(price_xof) / 650).toFixed(2));
+
+    // Enregistrement (plan_id = item_id tel quel : "strat_C1" ou "idea_3")
+    const dbRes = await pool.query(
+      `INSERT INTO payment_requests
+         (user_id, plan_id, plan_label, amount_usd, duration_minutes, payment_method, status)
+       VALUES ($1,$2,$3,$4,0,'mobile_money','pending') RETURNING id`,
+      [req.session.userId, item_id, item_name, price_usd]
+    );
+    const payReqId = dbRes.rows[0].id;
+
+    const origin     = req.headers.origin || `http://localhost:${PORT}`;
+    const return_url = `${origin}/success.html?req=${payReqId}&type=item`;
+
+    const paymentData = {
+      totalPrice: parseInt(price_xof, 10),
+      article:    [{ [item_name]: parseInt(price_xof, 10) }],
+      numeroSend: String(numeroSend).trim(),
+      nomclient,
+      return_url,
+    };
+
+    console.log("[BUY-ITEM] Appel Money Fusion:", JSON.stringify(paymentData));
+
+    const mfRes = await fetch(CONFIG.API_URL, {
+      method:  "POST",
+      headers: {
+        "Content-Type":  "application/json",
+        "Authorization": `Bearer ${CONFIG.API_KEY}`,
+      },
+      body: JSON.stringify(paymentData),
+    });
+    const data = await mfRes.json();
+    console.log("[BUY-ITEM] Réponse:", JSON.stringify(data));
+
+    const mfToken = data.token || data.tokenPay || null;
+    if (mfToken) {
+      await pool.query(
+        "UPDATE payment_requests SET transaction_id = $1 WHERE id = $2",
+        [mfToken, payReqId]
+      );
+    }
+
+    res.json({ ...data, payment_req_id: payReqId });
+  } catch (err) {
+    console.error("[BUY-ITEM]", err);
+    res.status(500).json({ error: "Erreur serveur — réessaie plus tard" });
+  }
+});
+
 // ─── ROUTE: Créer paiement Mobile Money ──────────────────────────────────
 app.post("/api/create-payment", requireAuth, async (req, res) => {
-  const { totalPrice, article, numeroSend, nomclient, plan_id } = req.body;
+  const { totalPrice, article, numeroSend, plan_id } = req.body;
 
   if (!totalPrice || totalPrice <= 0)
     return res.status(400).json({ error: "Montant requis" });
   if (!numeroSend || String(numeroSend).trim().length < 8)
     return res.status(400).json({ error: "Numéro de téléphone requis (min 8 chiffres)" });
-  if (!nomclient)
-    return res.status(400).json({ error: "Nom du client requis" });
+
+  // Récupérer le nom depuis la base de données
+  const userRes = await pool.query(
+    "SELECT first_name, last_name, username FROM users WHERE id = $1",
+    [req.session.userId]
+  );
+  const u = userRes.rows[0];
+  const nomclient = [u.first_name, u.last_name].filter(Boolean).join(" ") || u.username;
 
   const plan = PLANS.find(p => p.id === plan_id) || null;
 
@@ -179,7 +344,7 @@ app.post("/api/create-payment", requireAuth, async (req, res) => {
       totalPrice: parseInt(String(totalPrice), 10),
       article:    article || [{ Abonnement: parseInt(String(totalPrice), 10) }],
       numeroSend: String(numeroSend).trim(),
-      nomclient:  String(nomclient).trim(),
+      nomclient,
       return_url,
     };
 
@@ -245,6 +410,8 @@ app.get("/api/payment-check/:id", requireAuth, async (req, res) => {
       return res.status(404).json({ error: "Paiement introuvable" });
 
     const pr = result.rows[0];
+    const pid = String(pr.plan_id);
+    const item_type = (pid.startsWith("idea_") || pid.startsWith("strat_")) ? "item" : "subscription";
 
     // Si Mobile Money et encore pending → vérifier auprès de Money Fusion
     if (pr.payment_method === "mobile_money" && pr.status === "pending" && pr.transaction_id) {
@@ -256,12 +423,12 @@ app.get("/api/payment-check/:id", requireAuth, async (req, res) => {
 
         if (mfData.statut === "payé" || mfData.status === "completed" || mfData.statut === true) {
           await activateSubscription(pr);
-          return res.json({ status: "validated", plan_label: pr.plan_label, duration_minutes: pr.duration_minutes });
+          return res.json({ status: "validated", plan_label: pr.plan_label, duration_minutes: pr.duration_minutes, item_type });
         }
       } catch (_) { /* on ignore l'erreur MF temporaire */ }
     }
 
-    res.json({ status: pr.status, plan_label: pr.plan_label, duration_minutes: pr.duration_minutes });
+    res.json({ status: pr.status, plan_label: pr.plan_label, duration_minutes: pr.duration_minutes, item_type });
   } catch (err) {
     console.error("[CHECK]", err);
     res.status(500).json({ error: "Erreur serveur" });
@@ -315,13 +482,28 @@ app.post("/webhook", async (req, res) => {
   res.status(200).send("OK");
 });
 
-// ─── HELPER: Activer l'abonnement ────────────────────────────────────────
+// ─── HELPER: Activer l'abonnement / achat ────────────────────────────────
 async function activateSubscription(pr) {
   await pool.query(
     "UPDATE payment_requests SET status = 'validated', admin_validated_at = NOW() WHERE id = $1",
     [pr.id]
   );
 
+  // Achat boutique (idée ou stratégie) → pas d'abonnement à activer
+  if (String(pr.plan_id).startsWith("idea_") || String(pr.plan_id).startsWith("strat_")) {
+    if (String(pr.plan_id).startsWith("idea_")) {
+      const idea_id = parseInt(String(pr.plan_id).replace("idea_", ""), 10);
+      await pool.query(
+        `INSERT INTO strategy_idea_purchases
+           (user_id, idea_id, idea_name, amount_usd, status, created_at)
+         VALUES ($1, $2, $3, $4, 'validated', NOW())`,
+        [pr.user_id, idea_id, pr.plan_label, pr.amount_usd]
+      ).catch(err => console.error("[IDEA-PURCHASE]", err.message));
+    }
+    return;
+  }
+
+  // Sinon, activer l'abonnement
   const userRes = await pool.query("SELECT subscription_expires_at FROM users WHERE id = $1", [pr.user_id]);
   if (userRes.rows.length === 0) return;
 

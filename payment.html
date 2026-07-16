@@ -56,25 +56,32 @@
         <h2 class="pay-step-title">Choisissez votre abonnement</h2>
         <p class="pay-step-sub">Sélectionnez la durée qui vous convient le mieux</p>
 
+        <!-- Sélecteur de devise -->
+        <div style="display:flex;gap:8px;justify-content:center;margin-bottom:20px">
+          <button class="curr-btn active" id="cbtn_xof" onclick="setCurr('xof')">🪙 XOF</button>
+          <button class="curr-btn" id="cbtn_usd" onclick="setCurr('usd')">$ USD</button>
+          <button class="curr-btn" id="cbtn_eur" onclick="setCurr('eur')">€ EUR</button>
+        </div>
+
         <div class="plans-grid">
           <div class="plan-card" onclick="selPlan('1j',this)">
             <div class="plan-emoji">⚡</div>
             <div class="plan-duration">1 Jour</div>
-            <div class="plan-price"><sup>XOF</sup> 2 000</div>
-            <div class="plan-usd">≈ $3.00 USD</div>
+            <div class="plan-price" id="price_1j"><sup>XOF</sup> 2 000</div>
+            <div class="plan-usd" id="sub_1j">≈ $3.00 · €2.79</div>
           </div>
           <div class="plan-card" onclick="selPlan('7j',this)">
             <div class="plan-popular">⭐ Populaire</div>
             <div class="plan-emoji">🚀</div>
             <div class="plan-duration">7 Jours</div>
-            <div class="plan-price"><sup>XOF</sup> 10 000</div>
-            <div class="plan-usd">≈ $16.00 USD</div>
+            <div class="plan-price" id="price_7j"><sup>XOF</sup> 10 000</div>
+            <div class="plan-usd" id="sub_7j">≈ $16.00 · €14.88</div>
           </div>
           <div class="plan-card" onclick="selPlan('30j',this)">
             <div class="plan-emoji">👑</div>
             <div class="plan-duration">30 Jours</div>
-            <div class="plan-price"><sup>XOF</sup> 30 000</div>
-            <div class="plan-usd">≈ $50.00 USD</div>
+            <div class="plan-price" id="price_30j"><sup>XOF</sup> 30 000</div>
+            <div class="plan-usd" id="sub_30j">≈ $50.00 · €46.50</div>
           </div>
         </div>
 
@@ -148,16 +155,6 @@
             </div>
           </div>
 
-          <div class="form-section" id="nameGrp" style="display:none">
-            <label class="form-label">Nom complet</label>
-            <div class="input-wrapper">
-              <svg class="input-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
-              </svg>
-              <input type="text" id="clientName" placeholder="Ex: Jean Dupont" oninput="chkMobile()">
-            </div>
-          </div>
-
           <div id="mErr" class="btn-pay-error hidden">
             <span>⚠</span><span id="mErrTxt"></span>
           </div>
@@ -188,6 +185,13 @@
           </div>
 
           <div id="addrBlock" style="display:none">
+            <!-- Montant exact à envoyer -->
+            <div style="background:rgba(240,192,64,0.1);border:1px solid rgba(240,192,64,0.3);border-radius:12px;padding:14px 16px;margin-bottom:16px;text-align:center">
+              <div style="font-size:.75rem;color:rgba(255,255,255,0.5);margin-bottom:4px">Montant exact à envoyer</div>
+              <div style="font-size:1.4rem;font-weight:800;color:#F0C040;letter-spacing:.02em" id="addrAmount">—</div>
+              <button onclick="copyAmount()" style="margin-top:6px;background:none;border:1px solid rgba(240,192,64,0.4);color:#F0C040;border-radius:6px;padding:4px 12px;cursor:pointer;font-size:.75rem">Copier le montant</button>
+            </div>
+
             <div class="address-reveal">
               <div class="addr-top">
                 <span class="addr-title" id="addrTitle"></span>
@@ -229,6 +233,18 @@
     </div>
   </main>
 
+  <!-- ─── OVERLAY IFRAME MONEY FUSION ───────────────────────────────── -->
+  <div id="mfOverlay" style="display:none;position:fixed;inset:0;z-index:400;flex-direction:column;background:#0a0f1e">
+    <div style="background:#0e1628;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(240,192,64,0.2);flex-shrink:0">
+      <span style="color:#F0C040;font-weight:700;font-size:.9rem">🔒 Paiement sécurisé</span>
+      <div style="display:flex;align-items:center;gap:12px">
+        <span id="mfStatus" style="color:rgba(255,255,255,0.45);font-size:.8rem">En attente…</span>
+        <button onclick="closeMfFrame()" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);color:rgba(255,255,255,0.7);border-radius:6px;padding:5px 12px;cursor:pointer;font-size:.8rem">✕ Annuler</button>
+      </div>
+    </div>
+    <iframe id="mfFrame" src="about:blank" style="flex:1;border:none;width:100%" allow="payment *; camera; microphone"></iframe>
+  </div>
+
   <script>
     // Étoiles
     (function(){
@@ -266,9 +282,45 @@
     ];
 
     let selPlanId=null, selMethod_=null, selCountry=null, selNet=null, selCrypto=null;
+    let liveRates = { usd_to_xof:656, usd_to_eur:0.93, btc_usd:60000, eth_usd:3000 };
+    let selCurr = 'xof';
 
-    // Auth check
+    // Auth check + fetch rates
     fetch('/api/me').then(r=>{if(r.status===401) window.location.href='/';}).catch(()=>{});
+    fetch('/api/rates').then(r=>r.json()).then(d=>{ liveRates=d; updatePlanPrices(); }).catch(()=>{});
+
+    // ─── Sélecteur de devise ────────────────────────────────────────────
+    const PLAN_DEFS = [
+      {id:'1j', xof:2000, usd:3.00},
+      {id:'7j', xof:10000, usd:16.00},
+      {id:'30j',xof:30000, usd:50.00},
+    ];
+    function setCurr(c){
+      selCurr=c;
+      ['xof','usd','eur'].forEach(k=>{
+        const b=document.getElementById('cbtn_'+k);
+        if(b) b.classList.toggle('active', k===c);
+      });
+      updatePlanPrices();
+    }
+    function updatePlanPrices(){
+      PLAN_DEFS.forEach(p=>{
+        const prEl=document.getElementById('price_'+p.id);
+        const sbEl=document.getElementById('sub_'+p.id);
+        if(!prEl||!sbEl) return;
+        const eur=(p.usd*liveRates.usd_to_eur).toFixed(2);
+        if(selCurr==='xof'){
+          prEl.innerHTML=`<sup>XOF</sup> ${p.xof.toLocaleString('fr-FR')}`;
+          sbEl.textContent=`≈ ${p.usd.toFixed(2)} · €${eur}`;
+        } else if(selCurr==='usd'){
+          prEl.innerHTML=`<sup>$</sup> ${p.usd.toFixed(2)}`;
+          sbEl.textContent=`≈ ${p.xof.toLocaleString('fr-FR')} XOF · €${eur}`;
+        } else {
+          prEl.innerHTML=`<sup>€</sup> ${eur}`;
+          sbEl.textContent=`≈ ${p.xof.toLocaleString('fr-FR')} XOF · ${p.usd.toFixed(2)}`;
+        }
+      });
+    }
 
     // ─── Step navigation ───────────────────────────────────────────────
     function goStep(n){
@@ -315,15 +367,16 @@
       const p=PLANS[selPlanId];
       document.getElementById('s3msub').textContent=`${p.label} — ${p.price.toLocaleString('fr-FR')} XOF`;
       selCountry=null; selNet=null;
-      // Pays
       const sel=document.getElementById('countrySelect');
       sel.innerHTML='<option value="" disabled selected>Sélectionner un pays</option>';
       Object.entries(COUNTRIES).forEach(([k,v])=>{
         const o=document.createElement('option');
         o.value=k; o.textContent=`${v.flag} ${v.name}`; sel.appendChild(o);
       });
-      ['netGrp','phoneGrp','nameGrp'].forEach(id=>document.getElementById(id).style.display='none');
+      ['netGrp','phoneGrp'].forEach(id=>document.getElementById(id).style.display='none');
+      document.getElementById('phoneInput').value='';
       document.getElementById('btnPayM').style.display='none';
+      document.getElementById('mErr').classList.add('hidden');
     }
     function onCountry(){
       const k=document.getElementById('countrySelect').value;
@@ -334,7 +387,6 @@
       renderNets(selCountry.nets);
       document.getElementById('netGrp').style.display='block';
       document.getElementById('phoneGrp').style.display='block';
-      document.getElementById('nameGrp').style.display='block';
       chkMobile();
     }
     function renderNets(nets){
@@ -342,18 +394,13 @@
       nets.forEach(net=>{
         const d=document.createElement('div'); d.className='network-chip';
         d.innerHTML=`<span class="net-dot" style="background:${net.c}"></span>${net.n}`;
-        d.onclick=()=>{
-          selNet=net;
-          document.querySelectorAll('.network-chip').forEach(c=>c.classList.remove('selected'));
-          d.classList.add('selected'); chkMobile();
-        };
+        d.onclick=()=>{ selNet=net; document.querySelectorAll('#netChips .network-chip').forEach(c=>c.classList.remove('selected')); d.classList.add('selected'); chkMobile(); };
         box.appendChild(d);
       });
     }
     function chkMobile(){
       const phone=(document.getElementById('phoneInput').value||'').trim();
-      const name=(document.getElementById('clientName').value||'').trim();
-      const ok=selNet && phone.length>=8 && name.length>0;
+      const ok=selNet && selCountry && phone.length>=8;
       document.getElementById('btnPayM').style.display=ok?'flex':'none';
     }
     async function payMobile(){
@@ -362,10 +409,9 @@
       const ld =document.getElementById('mLoad');
       const err=document.getElementById('mErr');
       const etx=document.getElementById('mErrTxt');
-      btn.disabled=true; txt.textContent='Traitement…'; ld.classList.remove('hidden');
+      btn.disabled=true; txt.textContent='Ouverture…'; ld.classList.remove('hidden');
       err.classList.add('hidden');
       const phone=document.getElementById('phoneInput').value.trim().replace(/\s/g,'');
-      const name=document.getElementById('clientName').value.trim();
       const p=PLANS[selPlanId];
       try {
         const r=await fetch('/api/create-payment',{
@@ -374,7 +420,6 @@
             totalPrice:p.price,
             article:[{Abonnement:p.price}],
             numeroSend:selCountry.code+phone,
-            nomclient:name,
             plan_id:selPlanId
           })
         });
@@ -394,19 +439,60 @@
       }
     }
 
+    // ─── Overlay iframe Money Fusion ────────────────────────────────
+    let _mfPollIv=null;
+    function openMfFrame(url, reqId, type){
+      if(_mfPollIv) clearInterval(_mfPollIv);
+      document.getElementById('mfFrame').src=url;
+      document.getElementById('mfOverlay').style.display='flex';
+      document.getElementById('mfStatus').textContent='En attente de confirmation…';
+      _mfPollIv=setInterval(async()=>{
+        try{
+          const r=await fetch('/api/payment-check/'+reqId);
+          const d=await r.json();
+          document.getElementById('mfStatus').textContent='Vérification…';
+          if(d.status==='validated'){
+            clearInterval(_mfPollIv);
+            document.getElementById('mfOverlay').style.display='none';
+            window.location.href='/success.html?req='+reqId+'&method=mobile'+(type!=='subscription'?'&type='+type:'');
+          }
+        }catch(_){}
+      },3000);
+    }
+    function closeMfFrame(){
+      if(_mfPollIv) clearInterval(_mfPollIv);
+      document.getElementById('mfOverlay').style.display='none';
+      document.getElementById('mfFrame').src='about:blank';
+    }
+
     // ─── ÉTAPE 3B : Crypto ────────────────────────────────────────────
-    function initS3c(){
+    function cryptoAmt(sym, usd){
+      if(sym==='USDT') return usd.toFixed(2)+' USDT';
+      if(sym==='BTC')  return (usd/liveRates.btc_usd).toFixed(6)+' BTC';
+      if(sym==='ETH')  return (usd/liveRates.eth_usd).toFixed(5)+' ETH';
+      return usd.toFixed(2)+' '+sym;
+    }
+    async function initS3c(){
       const p=PLANS[selPlanId];
-      document.getElementById('s3csub').textContent=`${p.label} — $${p.usd.toFixed(2)} USD`;
+      // Refresh rates before showing amounts
+      try { const r=await fetch('/api/rates'); liveRates=await r.json(); } catch(_){}
+      document.getElementById('s3csub').textContent=`${p.label} — ${p.usd.toFixed(2)} USD · €${(p.usd*liveRates.usd_to_eur).toFixed(2)} EUR · ${p.price.toLocaleString('fr-FR')} XOF`;
       selCrypto=null;
       const box=document.getElementById('cryptoChips'); box.innerHTML='';
       CRYPTOS.forEach(w=>{
+        const amt=cryptoAmt(w.sym, p.usd);
         const d=document.createElement('div'); d.className='crypto-chip';
-        d.innerHTML=`<div class="crypto-sym-badge">${w.icon}</div><div><div class="crypto-chip-name">${w.name}</div><div class="crypto-chip-sym">${w.sym} · ${w.net}</div></div>`;
+        d.innerHTML=`
+          <div class="crypto-sym-badge">${w.icon}</div>
+          <div>
+            <div class="crypto-chip-name">${w.name}</div>
+            <div class="crypto-chip-sym">${w.sym} · ${w.net}</div>
+            <div style="color:#F0C040;font-size:.78rem;font-weight:700;margin-top:3px">${amt}</div>
+          </div>`;
         d.onclick=()=>{
-          selCrypto=w;
+          selCrypto={...w, amount:amt};
           document.querySelectorAll('.crypto-chip').forEach(c=>c.classList.remove('selected'));
-          d.classList.add('selected'); showAddr(w);
+          d.classList.add('selected'); showAddr(selCrypto);
         };
         box.appendChild(d);
       });
@@ -416,9 +502,9 @@
       document.getElementById('addrTitle').textContent=w.name;
       document.getElementById('addrNet').textContent=w.net;
       document.getElementById('addrVal').textContent=w.addr;
-      document.getElementById('addrMin').textContent=w.min;
+      document.getElementById('addrAmount').textContent=w.amount||'—';
+      document.getElementById('addrMin').textContent=w.min||'';
       document.getElementById('addrBlock').style.display='block';
-      document.getElementById('btnCopy').textContent=''; // reset
       document.getElementById('btnCopy').innerHTML=`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copier l'adresse`;
       document.getElementById('btnCopy').className='btn-copy';
     }
@@ -427,10 +513,11 @@
       navigator.clipboard.writeText(selCrypto.addr);
       const b=document.getElementById('btnCopy');
       b.innerHTML='✓ Copié !'; b.className='btn-copy copied';
-      setTimeout(()=>{
-        b.innerHTML=`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copier l'adresse`;
-        b.className='btn-copy';
-      },2500);
+      setTimeout(()=>{ b.innerHTML=`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copier l'adresse`; b.className='btn-copy'; },2500);
+    }
+    function copyAmount(){
+      if(!selCrypto?.amount) return;
+      navigator.clipboard.writeText(selCrypto.amount.split(' ')[0]);
     }
     async function payCrypto(){
       const err=document.getElementById('cErr');
@@ -449,5 +536,10 @@
       } catch { etx.textContent='Erreur réseau.'; err.classList.remove('hidden'); }
     }
   </script>
+  <style>
+    .curr-btn{background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);color:rgba(255,255,255,0.55);border-radius:8px;padding:6px 16px;cursor:pointer;font-size:.8rem;font-weight:600;transition:.2s;font-family:inherit}
+    .curr-btn.active{background:rgba(240,192,64,0.15);border-color:#F0C040;color:#F0C040}
+    .curr-btn:hover{border-color:rgba(240,192,64,0.4);color:#F0C040}
+  </style>
 </body>
 </html>
