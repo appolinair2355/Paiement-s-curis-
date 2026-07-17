@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Panneau administrateur — Sossou Kouamé</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <style>
+    .admin-hero{background:linear-gradient(135deg,rgba(99,102,241,0.15),rgba(139,92,246,0.1));border:1px solid rgba(99,102,241,0.25);border-radius:20px;padding:24px;margin-bottom:22px}
+    .admin-hero h2{color:#A5B4FC;margin:0 0 4px}
+    .admin-hero p{color:rgba(255,255,255,0.65);margin:0;font-size:.9rem}
+    .stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:22px}
+    .stat-card{background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:14px;padding:16px}
+    .stat-label{color:rgba(255,255,255,0.5);font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;font-weight:700;margin-bottom:6px}
+    .stat-value{color:#fff;font-size:1.5rem;font-weight:800;line-height:1.1}
+    .stat-sub{color:rgba(255,255,255,0.4);font-size:.72rem;margin-top:4px}
+    .filters{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px;align-items:center}
+    .filters select,.filters input{background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.12);color:#fff;border-radius:8px;padding:8px 12px;font-size:.85rem;font-family:inherit;outline:none}
+    .filters input{flex:1;min-width:200px}
+    .filters button{background:rgba(240,192,64,0.15);border:1px solid rgba(240,192,64,0.35);color:#F0C040;border-radius:8px;padding:8px 14px;font-size:.85rem;cursor:pointer;font-weight:600}
+    .table-wrap{background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:14px;overflow:auto;max-height:70vh}
+    table.pay-table{width:100%;border-collapse:collapse;font-size:.82rem;min-width:900px}
+    .pay-table th{position:sticky;top:0;background:#0e1628;color:#F0C040;text-align:left;padding:10px 12px;font-weight:700;font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid rgba(255,255,255,0.1)}
+    .pay-table td{padding:10px 12px;border-bottom:1px solid rgba(255,255,255,0.05);color:rgba(255,255,255,0.85);vertical-align:top}
+    .pay-table tr:hover td{background:rgba(255,255,255,0.03)}
+    .badge{display:inline-block;padding:3px 8px;border-radius:100px;font-size:.68rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
+    .b-validated{background:rgba(16,185,129,0.15);color:#10B981;border:1px solid rgba(16,185,129,0.3)}
+    .b-pending{background:rgba(240,192,64,0.15);color:#F0C040;border:1px solid rgba(240,192,64,0.3)}
+    .b-awaiting{background:rgba(59,130,246,0.15);color:#60A5FA;border:1px solid rgba(59,130,246,0.3)}
+    .b-support{background:rgba(236,72,153,0.15);color:#F472B6;border:1px solid rgba(236,72,153,0.3)}
+    .b-sub{background:rgba(99,102,241,0.15);color:#A5B4FC;border:1px solid rgba(99,102,241,0.3)}
+    .b-item{background:rgba(139,92,246,0.15);color:#C4B5FD;border:1px solid rgba(139,92,246,0.3)}
+    .txid{font-family:monospace;font-size:.72rem;color:rgba(255,255,255,0.5);word-break:break-all;max-width:180px;display:inline-block}
+    .user-cell strong{color:#fff;display:block}
+    .user-cell small{color:rgba(255,255,255,0.45);font-size:.72rem}
+    .deny{padding:60px 20px;text-align:center;color:rgba(255,255,255,0.6)}
+  </style>
+</head>
+<body>
+  <div class="bg-canvas"></div>
+  <div class="grid-overlay"></div>
+  <div class="stars" id="stars"></div>
+
+  <nav class="navbar">
+    <div class="nav-container">
+      <a href="/dashboard.html" class="logo-link">
+        <img src="logo-sk.png" alt="" class="logo-img" onerror="this.style.display='none'">
+        <span class="logo-text">SOSSOU KOUAMÉ</span>
+      </a>
+      <div class="nav-right">
+        <a href="/dashboard.html" class="btn-logout" style="text-decoration:none">← Retour</a>
+      </div>
+    </div>
+  </nav>
+
+  <main class="page-main" style="position:relative;z-index:1">
+    <div class="container" style="max-width:1200px">
+      <div id="denyBox" class="deny" style="display:none">
+        <h2>🔒 Accès réservé</h2>
+        <p>Cette section est réservée à l'administrateur.</p>
+        <a href="/dashboard.html" class="btn-primary" style="text-decoration:none;display:inline-flex;margin-top:16px">Retour au dashboard</a>
+      </div>
+
+      <div id="adminMain" style="display:none">
+        <div class="admin-hero">
+          <h2>🛡️ Panneau administrateur</h2>
+          <p>Consultez tous les paiements, transactions et références. Vue exhaustive réservée à l'administrateur.</p>
+        </div>
+
+        <div class="stats-grid" id="statsGrid"></div>
+
+        <div class="filters">
+          <select id="fType">
+            <option value="">Tous types</option>
+            <option value="support">💖 Soutien</option>
+            <option value="subscription">✦ Abonnement</option>
+            <option value="item">🛍️ Boutique</option>
+          </select>
+          <select id="fStatus">
+            <option value="">Tous statuts</option>
+            <option value="validated">✓ Validé</option>
+            <option value="pending">⏳ En attente</option>
+            <option value="awaiting_screenshot">📸 En attente crypto</option>
+          </select>
+          <input id="fQ" type="text" placeholder="Recherche : identifiant, nom, référence, produit…">
+          <button onclick="loadPayments()">🔍 Filtrer</button>
+          <button onclick="exportCSV()" style="background:rgba(16,185,129,0.15);border-color:rgba(16,185,129,0.35);color:#10B981">⬇ Export CSV</button>
+        </div>
+
+        <div class="table-wrap">
+          <table class="pay-table" id="payTable">
+            <thead>
+              <tr>
+                <th>#ID</th>
+                <th>Date</th>
+                <th>Identifiant / Nom</th>
+                <th>Type</th>
+                <th>Produit / Palier</th>
+                <th>Montant</th>
+                <th>Méthode</th>
+                <th>Statut</th>
+                <th>Référence transaction</th>
+              </tr>
+            </thead>
+            <tbody id="payBody">
+              <tr><td colspan="9" style="text-align:center;padding:24px;color:rgba(255,255,255,0.5)">Chargement…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    (function(){
+      const c=document.getElementById('stars');
+      for(let i=0;i<50;i++){
+        const s=document.createElement('div'); s.className='star';
+        const sz=Math.random()*1.5+.5;
+        s.style.cssText=`width:${sz}px;height:${sz}px;top:${Math.random()*100}%;left:${Math.random()*100}%;--dur:${2+Math.random()*4}s;--delay:${Math.random()*5}s`;
+        c.appendChild(s);
+      }
+    })();
+
+    let currentRows=[];
+
+    async function boot(){
+      const me=await fetch('/api/me');
+      if(me.status===401){ location.href='/'; return; }
+      const u=await me.json();
+      if(!u.is_admin){ document.getElementById('denyBox').style.display='block'; return; }
+      document.getElementById('adminMain').style.display='block';
+      loadStats();
+      loadPayments();
+    }
+
+    async function loadStats(){
+      try{
+        const r=await fetch('/api/admin/stats');
+        if(!r.ok) return;
+        const d=await r.json();
+        const g=document.getElementById('statsGrid'); g.innerHTML='';
+
+        const t=d.totals||{};
+        const cards=[
+          {l:'Total paiements',v:(t.total_payments||0).toLocaleString('fr-FR'),s:`${(t.unique_payers||0)} payeurs uniques`},
+          {l:'Revenu validé',v:`${(t.total_validated_xof||0).toLocaleString('fr-FR')} FCFA`,s:`$${(t.total_validated_usd||0).toFixed(2)}`},
+          {l:'Dernières 24h',v:(d.last_24h||0).toLocaleString('fr-FR'),s:'nouvelles demandes'},
+        ];
+        (d.by_type||[]).forEach(t=>{
+          const lbl=t.type==='support'?'💖 Soutien':t.type==='subscription'?'✦ Abonnements':'🛍️ Boutique';
+          cards.push({l:lbl,v:(t.n||0).toLocaleString('fr-FR'),s:`${t.payers||0} payeurs · ${(t.validated_xof||0).toLocaleString('fr-FR')} FCFA validé`});
+        });
+        cards.forEach(c=>{
+          const el=document.createElement('div'); el.className='stat-card';
+          el.innerHTML=`<div class="stat-label">${c.l}</div><div class="stat-value">${c.v}</div><div class="stat-sub">${c.s}</div>`;
+          g.appendChild(el);
+        });
+      }catch(e){ console.error(e); }
+    }
+
+    async function loadPayments(){
+      const t=document.getElementById('fType').value;
+      const st=document.getElementById('fStatus').value;
+      const q=document.getElementById('fQ').value.trim();
+      const params=new URLSearchParams();
+      if(t) params.set('type',t);
+      if(st) params.set('status',st);
+      if(q) params.set('q',q);
+      document.getElementById('payBody').innerHTML='<tr><td colspan="9" style="text-align:center;padding:24px;color:rgba(255,255,255,0.5)">Chargement…</td></tr>';
+      try{
+        const r=await fetch('/api/admin/payments?'+params.toString());
+        if(!r.ok){ document.getElementById('payBody').innerHTML='<tr><td colspan="9" style="text-align:center;padding:24px;color:#F87171">Erreur de chargement</td></tr>'; return; }
+        const d=await r.json();
+        currentRows=d.payments||[];
+        renderRows(currentRows);
+      }catch(e){
+        document.getElementById('payBody').innerHTML='<tr><td colspan="9" style="text-align:center;padding:24px;color:#F87171">Erreur réseau</td></tr>';
+      }
+    }
+
+    function renderRows(rows){
+      const body=document.getElementById('payBody');
+      if(!rows.length){ body.innerHTML='<tr><td colspan="9" style="text-align:center;padding:24px;color:rgba(255,255,255,0.4)">Aucun paiement trouvé</td></tr>'; return; }
+      body.innerHTML=rows.map(r=>{
+        const dt=r.created_at?new Date(r.created_at).toLocaleString('fr-FR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}):'—';
+        const status=r.status||'—';
+        const sCls=status==='validated'?'b-validated':status==='pending'?'b-pending':'b-awaiting';
+        const tCls=r.type==='support'?'b-support':r.type==='subscription'?'b-sub':'b-item';
+        const tLbl=r.type==='support'?'💖 Soutien':r.type==='subscription'?'✦ Abonnement':'🛍️ Boutique';
+        const fullName=[r.first_name,r.last_name].filter(Boolean).join(' ');
+        return `<tr>
+          <td>#${r.id}</td>
+          <td style="white-space:nowrap">${dt}</td>
+          <td class="user-cell"><strong>${escapeHtml(r.username||'—')}</strong>${fullName?`<small>${escapeHtml(fullName)}</small>`:''}<small>user_id: ${r.user_id||'—'}</small></td>
+          <td><span class="badge ${tCls}">${tLbl}</span></td>
+          <td>${escapeHtml(r.plan_label||'—')}<br><small style="color:rgba(255,255,255,0.4);font-size:.7rem">${escapeHtml(r.plan_id||'')}</small></td>
+          <td><strong>${(r.amount_xof||0).toLocaleString('fr-FR')} FCFA</strong><br><small style="color:rgba(255,255,255,0.4);font-size:.7rem">$${(Number(r.amount_usd)||0).toFixed(2)}</small></td>
+          <td>${r.payment_method==='crypto'?'₿ Crypto':'📱 Mobile'}</td>
+          <td><span class="badge ${sCls}">${status}</span></td>
+          <td><span class="txid">${escapeHtml(r.transaction_id||'—')}</span></td>
+        </tr>`;
+      }).join('');
+    }
+
+    function escapeHtml(s){ return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+    function exportCSV(){
+      if(!currentRows.length){ alert('Aucune donnée à exporter'); return; }
+      const headers=['id','date','username','nom_complet','user_id','type','plan_id','plan_label','amount_xof','amount_usd','payment_method','status','transaction_id','admin_validated_at'];
+      const rows=[headers.join(',')];
+      currentRows.forEach(r=>{
+        const full=[r.first_name,r.last_name].filter(Boolean).join(' ');
+        const line=[r.id,r.created_at||'',r.username||'',full,r.user_id||'',r.type,r.plan_id||'',r.plan_label||'',r.amount_xof||0,r.amount_usd||0,r.payment_method||'',r.status||'',r.transaction_id||'',r.admin_validated_at||''];
+        rows.push(line.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(','));
+      });
+      const blob=new Blob([rows.join('\n')],{type:'text/csv;charset=utf-8'});
+      const url=URL.createObjectURL(blob);
+      const a=document.createElement('a'); a.href=url; a.download=`paiements_${new Date().toISOString().slice(0,10)}.csv`; a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    boot();
+  </script>
+</body>
+</html>

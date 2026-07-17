@@ -32,6 +32,41 @@ const PLANS = [
   { id: "30j", label: "30 Jours", duration_minutes: 43200, amount_usd: 50.00, price_xof: 30000 },
 ];
 
+
+// ─── PALIERS DE SOUTIEN AU DÉVELOPPEUR ───────────────────────────────────
+const SUPPORT_TIERS = [
+  { id: "sup_200",    label: "Soutien simple",    price_xof:    200 },
+  { id: "sup_500",    label: "Soutien simple+",   price_xof:    500 },
+  { id: "sup_1000",   label: "Soutien bronze",    price_xof:   1000 },
+  { id: "sup_2000",   label: "Soutien bronze+",   price_xof:   2000 },
+  { id: "sup_3000",   label: "Soutien argent",    price_xof:   3000 },
+  { id: "sup_5000",   label: "Soutien argent+",   price_xof:   5000 },
+  { id: "sup_7500",   label: "Soutien or",        price_xof:   7500 },
+  { id: "sup_10000",  label: "Soutien or+",       price_xof:  10000 },
+  { id: "sup_15000",  label: "Soutien platine",   price_xof:  15000 },
+  { id: "sup_20000",  label: "Soutien platine+",  price_xof:  20000 },
+  { id: "sup_25000",  label: "Soutien diamant",   price_xof:  25000 },
+  { id: "sup_30000",  label: "Soutien diamant+",  price_xof:  30000 },
+  { id: "sup_35000",  label: "Soutien élite",     price_xof:  35000 },
+  { id: "sup_40000",  label: "Soutien élite+",    price_xof:  40000 },
+  { id: "sup_45000",  label: "Soutien prestige",  price_xof:  45000 },
+  { id: "sup_50000",  label: "Soutien prestige+", price_xof:  50000 },
+  { id: "sup_55000",  label: "Soutien VIP",       price_xof:  55000 },
+  { id: "sup_60000",  label: "Soutien VIP+",      price_xof:  60000 },
+  { id: "sup_65000",  label: "Soutien royal",     price_xof:  65000 },
+  { id: "sup_70000",  label: "Soutien royal+",    price_xof:  70000 },
+  { id: "sup_75000",  label: "Soutien impérial",  price_xof:  75000 },
+  { id: "sup_80000",  label: "Soutien impérial+", price_xof:  80000 },
+  { id: "sup_85000",  label: "Soutien légende",   price_xof:  85000 },
+  { id: "sup_90000",  label: "Soutien légende+",  price_xof:  90000 },
+  { id: "sup_95000",  label: "Soutien ultime",    price_xof:  95000 },
+  { id: "sup_100000", label: "Soutien ultime+",   price_xof: 100000 },
+  { id: "sup_120000", label: "Soutien titan",     price_xof: 120000 },
+  { id: "sup_150000", label: "Soutien titan+",    price_xof: 150000 },
+  { id: "sup_175000", label: "Soutien mythique",  price_xof: 175000 },
+  { id: "sup_200000", label: "Soutien mythique+", price_xof: 200000 },
+];
+
 // ─── WALLETS CRYPTO ───────────────────────────────────────────────────────
 const CRYPTO_WALLETS = [
   { id: "USDT_TRC20", name: "Tether TRC20", symbol: "USDT", icon: "₮", network: "TRON",     address: "T9zZ123xABCdef456GHIjkl789mnoPQRst", min: "10 USDT" },
@@ -91,6 +126,21 @@ app.use((req, res, next) => {
 function requireAuth(req, res, next) {
   if (!req.session.userId) return res.status(401).json({ error: "Non authentifié" });
   next();
+}
+
+
+async function requireAdmin(req, res, next) {
+  if (!req.session.userId) return res.status(401).json({ error: "Non authentifié" });
+  try {
+    const r = await pool.query("SELECT is_admin FROM users WHERE id = $1", [req.session.userId]);
+    if (r.rows.length === 0 || !r.rows[0].is_admin) {
+      return res.status(403).json({ error: "Accès réservé à l'administrateur" });
+    }
+    next();
+  } catch (e) {
+    console.error("[ADMIN-MW]", e);
+    res.status(500).json({ error: "Erreur serveur" });
+  }
 }
 
 // ─── STATIC FILES ─────────────────────────────────────────────────────────
@@ -411,7 +461,9 @@ app.get("/api/payment-check/:id", requireAuth, async (req, res) => {
 
     const pr = result.rows[0];
     const pid = String(pr.plan_id);
-    const item_type = (pid.startsWith("idea_") || pid.startsWith("strat_")) ? "item" : "subscription";
+    const item_type = pid.startsWith("sup_") ? "support"
+      : (pid.startsWith("idea_") || pid.startsWith("strat_")) ? "item"
+      : "subscription";
 
     // Si Mobile Money et encore pending → vérifier auprès de Money Fusion
     if (pr.payment_method === "mobile_money" && pr.status === "pending" && pr.transaction_id) {
@@ -489,6 +541,11 @@ async function activateSubscription(pr) {
     [pr.id]
   );
 
+  // Soutien au développeur → pas d'abonnement à activer
+  if (String(pr.plan_id).startsWith("sup_")) {
+    return;
+  }
+
   // Achat boutique (idée ou stratégie) → pas d'abonnement à activer
   if (String(pr.plan_id).startsWith("idea_") || String(pr.plan_id).startsWith("strat_")) {
     if (String(pr.plan_id).startsWith("idea_")) {
@@ -519,6 +576,162 @@ async function activateSubscription(pr) {
     [newExpiry, pr.user_id]
   );
 }
+
+
+// ─── ROUTE: Liste des paliers de soutien ─────────────────────────────────
+app.get("/api/support-tiers", requireAuth, (req, res) => {
+  res.json({ tiers: SUPPORT_TIERS });
+});
+
+// ─── ROUTE: Créer un paiement de soutien ─────────────────────────────────
+app.post("/api/create-support", requireAuth, async (req, res) => {
+  const { tier_id, numeroSend } = req.body;
+  const tier = SUPPORT_TIERS.find(t => t.id === tier_id);
+  if (!tier) return res.status(400).json({ error: "Palier de soutien invalide" });
+  if (!numeroSend || String(numeroSend).trim().length < 8) {
+    return res.status(400).json({ error: "Numéro de téléphone requis (min 8 chiffres)" });
+  }
+
+  try {
+    const userRes = await pool.query(
+      "SELECT first_name, last_name, username FROM users WHERE id = $1",
+      [req.session.userId]
+    );
+    const u = userRes.rows[0];
+    const nomclient = [u.first_name, u.last_name].filter(Boolean).join(" ") || u.username;
+
+    const price_usd = parseFloat((tier.price_xof / 650).toFixed(2));
+
+    const dbRes = await pool.query(
+      `INSERT INTO payment_requests
+         (user_id, plan_id, plan_label, amount_usd, duration_minutes, payment_method, status)
+       VALUES ($1,$2,$3,$4,0,'mobile_money','pending') RETURNING id`,
+      [req.session.userId, tier.id, tier.label, price_usd]
+    );
+    const payReqId = dbRes.rows[0].id;
+
+    const origin     = req.headers.origin || `http://localhost:${PORT}`;
+    const return_url = `${origin}/success.html?req=${payReqId}&type=support`;
+
+    const paymentData = {
+      totalPrice: tier.price_xof,
+      article:    [{ [tier.label]: tier.price_xof }],
+      numeroSend: String(numeroSend).trim(),
+      nomclient,
+      return_url,
+    };
+
+    console.log("[SUPPORT] Appel Money Fusion:", JSON.stringify(paymentData));
+
+    const mfRes = await fetch(CONFIG.API_URL, {
+      method:  "POST",
+      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${CONFIG.API_KEY}` },
+      body: JSON.stringify(paymentData),
+    });
+    const data = await mfRes.json();
+    console.log("[SUPPORT] Réponse:", JSON.stringify(data));
+
+    const mfToken = data.token || data.tokenPay || null;
+    if (mfToken) {
+      await pool.query(
+        "UPDATE payment_requests SET transaction_id = $1 WHERE id = $2",
+        [mfToken, payReqId]
+      );
+    }
+
+    res.json({ ...data, payment_req_id: payReqId });
+  } catch (err) {
+    console.error("[SUPPORT-CREATE]", err);
+    res.status(500).json({ error: "Erreur serveur — réessaie plus tard" });
+  }
+});
+
+// ─── ADMIN: Liste complète des paiements ─────────────────────────────────
+app.get("/api/admin/payments", requireAdmin, async (req, res) => {
+  try {
+    const { type, status, q, limit } = req.query;
+    const lim = Math.min(parseInt(limit, 10) || 500, 2000);
+
+    const conds = [];
+    const params = [];
+    if (status) { params.push(status); conds.push(`pr.status = ${params.length}`); }
+    if (type === "support")      conds.push("pr.plan_id LIKE 'sup_%'");
+    else if (type === "subscription") conds.push("pr.plan_id NOT LIKE 'sup_%' AND pr.plan_id NOT LIKE 'idea_%' AND pr.plan_id NOT LIKE 'strat_%'");
+    else if (type === "item")    conds.push("(pr.plan_id LIKE 'idea_%' OR pr.plan_id LIKE 'strat_%')");
+    if (q) {
+      params.push(`%${q}%`);
+      conds.push(`(u.username ILIKE ${params.length} OR u.first_name ILIKE ${params.length} OR u.last_name ILIKE ${params.length} OR pr.transaction_id ILIKE ${params.length} OR pr.plan_label ILIKE ${params.length})`);
+    }
+    const where = conds.length ? "WHERE " + conds.join(" AND ") : "";
+    params.push(lim);
+
+    const sql = `
+      SELECT pr.id, pr.user_id, pr.plan_id, pr.plan_label, pr.amount_usd,
+             pr.duration_minutes, pr.payment_method, pr.status, pr.transaction_id,
+             pr.admin_validated_at, pr.created_at,
+             u.username, u.first_name, u.last_name
+      FROM payment_requests pr
+      LEFT JOIN users u ON u.id = pr.user_id
+      ${where}
+      ORDER BY pr.created_at DESC NULLS LAST, pr.id DESC
+      LIMIT ${params.length}
+    `;
+    const r = await pool.query(sql, params);
+    const rows = r.rows.map(row => {
+      const pid = String(row.plan_id || "");
+      const type = pid.startsWith("sup_") ? "support"
+                 : (pid.startsWith("idea_") || pid.startsWith("strat_")) ? "item"
+                 : "subscription";
+      return {
+        ...row,
+        amount_xof: Math.round((Number(row.amount_usd) || 0) * 650),
+        type,
+      };
+    });
+    res.json({ payments: rows });
+  } catch (err) {
+    console.error("[ADMIN-PAYMENTS]", err);
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
+
+// ─── ADMIN: Statistiques globales ────────────────────────────────────────
+app.get("/api/admin/stats", requireAdmin, async (req, res) => {
+  try {
+    const q = async (sql, p=[]) => (await pool.query(sql, p)).rows;
+
+    const [byStatus, byType, totals, recentCount] = await Promise.all([
+      q(`SELECT status, COUNT(*)::int AS n FROM payment_requests GROUP BY status`),
+      q(`SELECT
+           CASE
+             WHEN plan_id LIKE 'sup_%'   THEN 'support'
+             WHEN plan_id LIKE 'idea_%'  THEN 'item'
+             WHEN plan_id LIKE 'strat_%' THEN 'item'
+             ELSE 'subscription'
+           END AS type,
+           COUNT(*)::int AS n,
+           COUNT(DISTINCT user_id)::int AS payers,
+           COALESCE(SUM(CASE WHEN status='validated' THEN amount_usd ELSE 0 END),0)::float AS validated_usd
+         FROM payment_requests GROUP BY 1`),
+      q(`SELECT COUNT(*)::int AS total_payments,
+                COUNT(DISTINCT user_id)::int AS unique_payers,
+                COALESCE(SUM(CASE WHEN status='validated' THEN amount_usd ELSE 0 END),0)::float AS total_validated_usd
+         FROM payment_requests`),
+      q(`SELECT COUNT(*)::int AS n FROM payment_requests
+         WHERE created_at > NOW() - INTERVAL '24 hours'`),
+    ]);
+
+    res.json({
+      by_status: byStatus,
+      by_type: byType.map(r => ({ ...r, validated_xof: Math.round(r.validated_usd * 650) })),
+      totals: { ...(totals[0]||{}), total_validated_xof: Math.round(((totals[0]||{}).total_validated_usd||0) * 650) },
+      last_24h: (recentCount[0]||{}).n || 0,
+    });
+  } catch (err) {
+    console.error("[ADMIN-STATS]", err);
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
 
 // ─── LANCEMENT ────────────────────────────────────────────────────────────
 app.listen(PORT, () => {
