@@ -25,47 +25,48 @@ const CONFIG = {
   API_KEY:    "moneyfusion_v1_69777b802181d4ebf71e2bde_9F8AA2BB17ED57E9EE1835A9C1AEE6A03012A677E40C93636A5458C6AE798852",
 };
 
-// ─── PLANS D'ABONNEMENT ───────────────────────────────────────────────────
-const PLANS = [
-  { id: "1j",  label: "1 Jour",   duration_minutes:  1440, amount_usd:  3.00, price_xof:  2000 },
-  { id: "7j",  label: "7 Jours",  duration_minutes: 10080, amount_usd: 16.00, price_xof: 10000 },
-  { id: "30j", label: "30 Jours", duration_minutes: 43200, amount_usd: 50.00, price_xof: 30000 },
+// ─── PLANS D'ABONNEMENT (lus depuis la BDD en temps réel) ────────────────
+const DEFAULT_PLANS = [
+  { id: "1j",  label: "1 Jour",   duration_minutes:  1440, amount_usd:  1.00, price_xof:   656 },
+  { id: "7j",  label: "7 Jours",  duration_minutes: 10080, amount_usd:  7.00, price_xof:  4592 },
+  { id: "30j", label: "30 Jours", duration_minutes: 43200, amount_usd: 30.00, price_xof: 19680 },
 ];
 
+async function getPlans() {
+  try {
+    const r = await pool.query("SELECT value FROM settings WHERE key = 'subscription_plans'");
+    if (r.rows.length > 0) return JSON.parse(r.rows[0].value);
+  } catch (e) { console.error("[PLANS-DB]", e.message); }
+  return DEFAULT_PLANS;
+}
 
-// ─── PALIERS DE SOUTIEN AU DÉVELOPPEUR ───────────────────────────────────
-const SUPPORT_TIERS = [
-  { id: "sup_200",    label: "Soutien simple",    price_xof:    200 },
-  { id: "sup_500",    label: "Soutien simple+",   price_xof:    500 },
-  { id: "sup_1000",   label: "Soutien bronze",    price_xof:   1000 },
-  { id: "sup_2000",   label: "Soutien bronze+",   price_xof:   2000 },
-  { id: "sup_3000",   label: "Soutien argent",    price_xof:   3000 },
-  { id: "sup_5000",   label: "Soutien argent+",   price_xof:   5000 },
-  { id: "sup_7500",   label: "Soutien or",        price_xof:   7500 },
-  { id: "sup_10000",  label: "Soutien or+",       price_xof:  10000 },
-  { id: "sup_15000",  label: "Soutien platine",   price_xof:  15000 },
-  { id: "sup_20000",  label: "Soutien platine+",  price_xof:  20000 },
-  { id: "sup_25000",  label: "Soutien diamant",   price_xof:  25000 },
-  { id: "sup_30000",  label: "Soutien diamant+",  price_xof:  30000 },
-  { id: "sup_35000",  label: "Soutien élite",     price_xof:  35000 },
-  { id: "sup_40000",  label: "Soutien élite+",    price_xof:  40000 },
-  { id: "sup_45000",  label: "Soutien prestige",  price_xof:  45000 },
-  { id: "sup_50000",  label: "Soutien prestige+", price_xof:  50000 },
-  { id: "sup_55000",  label: "Soutien VIP",       price_xof:  55000 },
-  { id: "sup_60000",  label: "Soutien VIP+",      price_xof:  60000 },
-  { id: "sup_65000",  label: "Soutien royal",     price_xof:  65000 },
-  { id: "sup_70000",  label: "Soutien royal+",    price_xof:  70000 },
-  { id: "sup_75000",  label: "Soutien impérial",  price_xof:  75000 },
-  { id: "sup_80000",  label: "Soutien impérial+", price_xof:  80000 },
-  { id: "sup_85000",  label: "Soutien légende",   price_xof:  85000 },
-  { id: "sup_90000",  label: "Soutien légende+",  price_xof:  90000 },
-  { id: "sup_95000",  label: "Soutien ultime",    price_xof:  95000 },
-  { id: "sup_100000", label: "Soutien ultime+",   price_xof: 100000 },
-  { id: "sup_120000", label: "Soutien titan",     price_xof: 120000 },
-  { id: "sup_150000", label: "Soutien titan+",    price_xof: 150000 },
-  { id: "sup_175000", label: "Soutien mythique",  price_xof: 175000 },
-  { id: "sup_200000", label: "Soutien mythique+", price_xof: 200000 },
-];
+
+// ─── PALIERS DE SOUTIEN (lus depuis support_packs en temps réel) ─────────
+async function getSupportTiers() {
+  try {
+    const r = await pool.query(
+      "SELECT id, label, amount_usd FROM support_packs WHERE enabled = true ORDER BY sort_order ASC NULLS LAST, id ASC"
+    );
+    // La colonne amount_usd contient les montants en XOF (FCFA)
+    return r.rows.map(row => ({
+      id:        `sup_${row.id}`,
+      label:     row.label,
+      price_xof: Number(row.amount_usd),
+    }));
+  } catch (e) {
+    console.error("[SUPPORT-TIERS-DB]", e.message);
+    return [];
+  }
+}
+
+// ─── PRIX DES STRATÉGIES (lus depuis settings en temps réel) ─────────────
+async function getStrategyPrices() {
+  try {
+    const r = await pool.query("SELECT value FROM settings WHERE key = 'strategy_prices'");
+    if (r.rows.length > 0) return JSON.parse(r.rows[0].value);
+  } catch (e) { console.error("[STRAT-PRICES-DB]", e.message); }
+  return { default_combo: 15000, default_standard: 10000 };
+}
 
 // ─── WALLETS CRYPTO ───────────────────────────────────────────────────────
 const CRYPTO_WALLETS = [
@@ -158,7 +159,10 @@ app.post("/api/login", async (req, res) => {
     return res.status(400).json({ error: "Identifiant et mot de passe requis" });
 
   try {
-    const result = await pool.query("SELECT * FROM users WHERE username = $1", [username.trim()]);
+    const result = await pool.query(
+      "SELECT * FROM users WHERE username = $1 OR email = $1",
+      [username.trim()]
+    );
     if (result.rows.length === 0)
       return res.status(401).json({ error: "Identifiant ou mot de passe incorrect" });
 
@@ -213,7 +217,8 @@ app.get("/api/me", requireAuth, async (req, res) => {
       is_active    = remaining_ms > 0;
     }
 
-    res.json({ ...user, remaining_ms, is_active, plans: PLANS, crypto_wallets: CRYPTO_WALLETS });
+    const plans = await getPlans();
+    res.json({ ...user, remaining_ms, is_active, plans, crypto_wallets: CRYPTO_WALLETS });
   } catch (err) {
     console.error("[ME]", err);
     res.status(500).json({ error: "Erreur serveur" });
@@ -225,9 +230,10 @@ app.get("/api/rates", requireAuth, async (req, res) => {
   res.json(await getExchangeRates());
 });
 
-// ─── ROUTE: Plans ─────────────────────────────────────────────────────────
-app.get("/api/plans", (req, res) => {
-  res.json({ plans: PLANS, crypto_wallets: CRYPTO_WALLETS });
+// ─── ROUTE: Plans (depuis la BDD en temps réel) ───────────────────────────
+app.get("/api/plans", async (req, res) => {
+  const plans = await getPlans();
+  res.json({ plans, crypto_wallets: CRYPTO_WALLETS });
 });
 
 // ─── ROUTE: Boutique (stratégies depuis settings + idées depuis DB) ──────
@@ -242,10 +248,11 @@ app.get("/api/shop", requireAuth, async (req, res) => {
     if (settRes.rows.length > 0) {
       try {
         const shopDesc = JSON.parse(settRes.rows[0].value);
+        const stratPrices = await getStrategyPrices();
         let sortIdx = 1;
         for (const [id, stats] of Object.entries(shopDesc)) {
-          // Prix selon catégorie (Combo = C, Standard = S)
-          const price_xof = id.startsWith("C") ? 15000 : 10000;
+          // Prix selon catégorie (Combo = C, Standard = S) — lus depuis la BDD
+          const price_xof = id.startsWith("C") ? stratPrices.default_combo : stratPrices.default_standard;
           const price_usd = parseFloat((price_xof / 650).toFixed(2));
           items.push({
             id:          `strat_${id}`,
@@ -371,7 +378,8 @@ app.post("/api/create-payment", requireAuth, async (req, res) => {
   const u = userRes.rows[0];
   const nomclient = [u.first_name, u.last_name].filter(Boolean).join(" ") || u.username;
 
-  const plan = PLANS.find(p => p.id === plan_id) || null;
+  const plans = await getPlans();
+  const plan = plans.find(p => p.id === plan_id) || null;
 
   try {
     // Enregistrement en base (statut: pending)
@@ -430,7 +438,8 @@ app.post("/api/create-payment", requireAuth, async (req, res) => {
 // ─── ROUTE: Déclarer paiement Crypto ─────────────────────────────────────
 app.post("/api/create-payment-crypto", requireAuth, async (req, res) => {
   const { plan_id, crypto_id, transaction_hash } = req.body;
-  const plan = PLANS.find(p => p.id === plan_id);
+  const plans = await getPlans();
+  const plan = plans.find(p => p.id === plan_id);
   if (!plan) return res.status(400).json({ error: "Plan invalide" });
 
   try {
@@ -578,15 +587,17 @@ async function activateSubscription(pr) {
 }
 
 
-// ─── ROUTE: Liste des paliers de soutien ─────────────────────────────────
-app.get("/api/support-tiers", requireAuth, (req, res) => {
-  res.json({ tiers: SUPPORT_TIERS });
+// ─── ROUTE: Liste des paliers de soutien (depuis support_packs en temps réel)
+app.get("/api/support-tiers", requireAuth, async (req, res) => {
+  const tiers = await getSupportTiers();
+  res.json({ tiers });
 });
 
 // ─── ROUTE: Créer un paiement de soutien ─────────────────────────────────
 app.post("/api/create-support", requireAuth, async (req, res) => {
   const { tier_id, numeroSend } = req.body;
-  const tier = SUPPORT_TIERS.find(t => t.id === tier_id);
+  const allTiers = await getSupportTiers();
+  const tier = allTiers.find(t => t.id === tier_id);
   if (!tier) return res.status(400).json({ error: "Palier de soutien invalide" });
   if (!numeroSend || String(numeroSend).trim().length < 8) {
     return res.status(400).json({ error: "Numéro de téléphone requis (min 8 chiffres)" });
@@ -733,9 +744,37 @@ app.get("/api/admin/stats", requireAdmin, async (req, res) => {
   }
 });
 
+// ─── SEEDING BDD : initialise les clés manquantes en settings ────────────
+async function seedSettings() {
+  try {
+    // subscription_plans — si absent, on insère les valeurs par défaut
+    const chk = await pool.query("SELECT 1 FROM settings WHERE key = 'subscription_plans'");
+    if (chk.rows.length === 0) {
+      await pool.query(
+        "INSERT INTO settings (key, value) VALUES ('subscription_plans', $1)",
+        [JSON.stringify(DEFAULT_PLANS)]
+      );
+      console.log("[SEED] subscription_plans créé en BDD");
+    }
+
+    // strategy_prices — si absent, on insère les valeurs par défaut
+    const chk2 = await pool.query("SELECT 1 FROM settings WHERE key = 'strategy_prices'");
+    if (chk2.rows.length === 0) {
+      await pool.query(
+        "INSERT INTO settings (key, value) VALUES ('strategy_prices', $1)",
+        [JSON.stringify({ default_combo: 15000, default_standard: 10000 })]
+      );
+      console.log("[SEED] strategy_prices créé en BDD");
+    }
+  } catch (e) {
+    console.error("[SEED-ERR]", e.message);
+  }
+}
+
 // ─── LANCEMENT ────────────────────────────────────────────────────────────
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   console.log("========================================");
   console.log(`Serveur Sossou Kouamé — Port ${PORT}`);
   console.log("========================================");
+  await seedSettings();
 });

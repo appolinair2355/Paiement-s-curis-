@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Connexion — Sossou Kouamé</title>
+  <title>Site de paiement Sossou Kouamé Shopping Boutique</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
@@ -20,10 +20,11 @@
 
       <div class="login-brand">
         <div class="login-icon-wrap">
-          <span class="login-icon">💎</span>
+          <img src="logo-sk.png" alt="Sossou Kouamé" class="login-logo-img" onerror="this.style.display='none';document.getElementById('login-icon-fallback').style.display='flex'">
+          <span class="login-icon" id="login-icon-fallback" style="display:none">💎</span>
         </div>
-        <h1>SOSSOU KOUAMÉ</h1>
-        <p>Espace membre sécurisé</p>
+        <h1>Site de paiement<br>Sossou Kouamé<br><span style="font-size:.75em;letter-spacing:.12em;opacity:.85">Shopping Boutique</span></h1>
+        <p>Paiement rapide &amp; sécurisé</p>
       </div>
 
       <form id="loginForm" onsubmit="handleLogin(event)">
@@ -68,7 +69,7 @@
       </form>
 
       <div class="login-divider"><span>✦ sécurisé par chiffrement ✦</span></div>
-      <p class="login-footer-note">© 2025 Sossou Kouamé — Tous droits réservés</p>
+      <p class="login-footer-note">© 2026 Sossou Kouamé Shopping Boutique — Tous droits réservés</p>
     </div>
   </div>
 
@@ -136,6 +137,18 @@
       0%,100%{transform:translateX(0)}
       20%,60%{transform:translateX(-6px)}
       40%,80%{transform:translateX(6px)}
+    }
+    .login-logo-img {
+      width: 80px;
+      height: 80px;
+      object-fit: contain;
+      filter: drop-shadow(0 0 16px rgba(255,200,60,0.55));
+      border-radius: 50%;
+    }
+    .login-brand h1 {
+      font-size: 1.25rem !important;
+      line-height: 1.35 !important;
+      text-align: center;
     }
   </style>
 </body>
