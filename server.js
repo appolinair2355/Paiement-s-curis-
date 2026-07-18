@@ -587,10 +587,74 @@ async function activateSubscription(pr) {
 }
 
 
-// ─── ROUTE: Liste des paliers de soutien (depuis support_packs en temps réel)
-app.get("/api/support-tiers", requireAuth, async (req, res) => {
+// ─── ROUTE: Liste des paliers de soutien — publique (pas de connexion requise)
+app.get("/api/support-tiers", async (req, res) => {
   const tiers = await getSupportTiers();
   res.json({ tiers });
+});
+
+// ─── ROUTE: Créer un soutien sans compte (public) ─────────────────────────
+app.post("/api/create-support-public", async (req, res) => {
+  const { tier_id, numeroSend, nomclient } = req.body;
+  const allTiers = await getSupportTiers();
+  const tier = allTiers.find(t => t.id === tier_id);
+  if (!tier) return res.status(400).json({ error: "Palier de soutien invalide" });
+  if (!numeroSend || String(numeroSend).trim().length < 8)
+    return res.status(400).json({ error: "Numéro de téléphone requis (min 8 chiffres)" });
+
+  const nom = (nomclient || "Donateur").trim() || "Donateur";
+  const price_usd = parseFloat((tier.price_xof / 650).toFixed(2));
+
+  try {
+    const dbRes = await pool.query(
+      `INSERT INTO payment_requests
+         (user_id, plan_id, plan_label, amount_usd, duration_minutes, payment_method, status)
+       VALUES (NULL,$1,$2,$3,0,'mobile_money','pending') RETURNING id`,
+      [tier.id, tier.label, price_usd]
+    ).catch(() =>
+      // Si user_id NOT NULL, on utilise -1 comme ID invité
+      pool.query(
+        `INSERT INTO payment_requests
+           (user_id, plan_id, plan_label, amount_usd, duration_minutes, payment_method, status)
+         VALUES (-1,$1,$2,$3,0,'mobile_money','pending') RETURNING id`,
+        [tier.id, tier.label, price_usd]
+      )
+    );
+    const payReqId = dbRes.rows[0].id;
+
+    const origin = req.headers.origin || `https://${req.headers.host}`;
+    const return_url = `${origin}/success.html?req=${payReqId}&type=support`;
+
+    const paymentData = {
+      totalPrice: tier.price_xof,
+      article:    [{ [tier.label]: tier.price_xof }],
+      numeroSend: String(numeroSend).trim(),
+      nomclient:  nom,
+      return_url,
+    };
+
+    console.log("[SUPPORT-PUBLIC] Appel Money Fusion:", JSON.stringify(paymentData));
+
+    const mfRes = await fetch(CONFIG.API_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${CONFIG.API_KEY}` },
+      body: JSON.stringify(paymentData),
+    });
+    const data = await mfRes.json();
+    console.log("[SUPPORT-PUBLIC] Réponse:", JSON.stringify(data));
+
+    const mfToken = data.token || data.tokenPay || null;
+    if (mfToken) {
+      await pool.query(
+        "UPDATE payment_requests SET transaction_id = $1 WHERE id = $2",
+        [mfToken, payReqId]
+      );
+    }
+    res.json({ ...data, payment_req_id: payReqId });
+  } catch (err) {
+    console.error("[SUPPORT-PUBLIC]", err);
+    res.status(500).json({ error: "Erreur serveur — réessaie plus tard" });
+  }
 });
 
 // ─── ROUTE: Créer un paiement de soutien ─────────────────────────────────

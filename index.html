@@ -7,45 +7,267 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
+  <style>
+    /* ── LAYOUT ── */
+    .page { display:none; flex-direction:column; align-items:center; min-height:100vh; padding:32px 16px 60px; position:relative; z-index:1; }
+    .page.active { display:flex; }
+
+    /* ── LOGO PLEINE LARGEUR ── */
+    .logo-card {
+      width: 100%;
+      max-width: 500px;
+      border-radius: 22px;
+      margin-bottom: 28px;
+      box-shadow: 0 0 48px rgba(0,150,255,.4), 0 12px 40px rgba(0,0,0,.5);
+      /* Ratio du PNG original : 1024×559 */
+      position: relative;
+      overflow: hidden;
+    }
+    /* Wrapper qui fixe la hauteur visible */
+    .logo-card-inner {
+      position: relative;
+      width: 100%;
+      /* ratio naturel du PNG : 559/1024 = 54.59% — on en montre ~80% en hauteur */
+      padding-bottom: 44%;
+      background: #fff;
+      overflow: hidden;
+      border-radius: 22px;
+    }
+    .logo-card img {
+      position: absolute;
+      /* Zoom léger 108% pour juste couper les fines marges blanches */
+      top: 50%;
+      left: 50%;
+      width: 108%;
+      height: auto;
+      transform: translate(-50%, -50%);
+      display: block;
+    }
+
+    /* ── MARQUE (pages intérieures) ── */
+    .page-brand {
+      text-align: center;
+      margin-bottom: 28px;
+      width: 100%;
+      max-width: 520px;
+    }
+    .page-brand-logo {
+      height: 54px;
+      width: auto;
+      border-radius: 10px;
+      overflow: hidden;
+      display: inline-block;
+      margin-bottom: 10px;
+    }
+    .page-brand-logo img { height: 54px; width: auto; display: block; }
+    .page-brand h1 {
+      font-size: clamp(.95rem, 3.5vw, 1.25rem);
+      font-weight: 800;
+      color: #F0C040;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+      margin: 0 0 4px;
+    }
+    .page-brand p { color: rgba(255,255,255,.45); font-size: .82rem; margin: 0; }
+
+    /* ── ACCUEIL : DEUX PANNEAUX ── */
+    .panels {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      width: 100%;
+      max-width: 460px;
+    }
+    .panel-btn {
+      width: 100%;
+      border: none;
+      border-radius: 20px;
+      padding: 0;
+      cursor: pointer;
+      background: none;
+      text-align: left;
+      transition: transform .18s;
+    }
+    .panel-btn:hover { transform: translateY(-3px); }
+    .panel-btn:active { transform: translateY(0); }
+    .panel-inner {
+      border-radius: 20px;
+      padding: 26px 22px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .panel-don .panel-inner  { background: linear-gradient(135deg, rgba(240,192,64,.18), rgba(249,115,22,.12)); border: 1.5px solid rgba(240,192,64,.4); }
+    .panel-serv .panel-inner { background: linear-gradient(135deg, rgba(99,102,241,.18), rgba(16,185,129,.1));  border: 1.5px solid rgba(99,102,241,.4);  }
+    .panel-icon { font-size: 2.2rem; flex-shrink: 0; line-height: 1; }
+    .panel-text h2 { font-size: 1rem; font-weight: 700; margin: 0 0 4px; color: #fff; }
+    .panel-don  .panel-text h2  { color: #F0C040; }
+    .panel-serv .panel-text h2 { color: #a5b4fc; }
+    .panel-text p { font-size: .8rem; color: rgba(255,255,255,.5); margin: 0; line-height: 1.45; }
+    .panel-arrow { margin-left:auto; font-size:1.6rem; color:rgba(255,255,255,.3); flex-shrink:0; }
+    .panel-btn:hover .panel-arrow { color: rgba(255,255,255,.8); }
+
+    /* ── TIERS GRID ── */
+    .tiers-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(185px, 1fr));
+      gap: 12px;
+      width: 100%;
+      max-width: 520px;
+      margin-top: 4px;
+    }
+    .tier-card {
+      background: rgba(255,255,255,.04);
+      border: 1px solid rgba(255,255,255,.08);
+      border-radius: 16px;
+      padding: 16px;
+      cursor: pointer;
+      transition: all .2s;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      position: relative;
+    }
+    .tier-card:hover { border-color: rgba(240,192,64,.5); transform: translateY(-3px); background: rgba(240,192,64,.07); }
+    .tier-badge { position:absolute;top:10px;right:10px;font-size:.58rem;font-weight:700;padding:2px 7px;border-radius:100px;letter-spacing:.05em;text-transform:uppercase; }
+    .tier-icon { font-size: 1.5rem; line-height: 1; }
+    .tier-label { color: #fff; font-weight: 700; font-size: .9rem; }
+    .tier-price { color: #F0C040; font-weight: 800; font-size: 1.05rem; margin-top: auto; }
+    .tier-price small { color: rgba(255,255,255,.4); font-size: .68rem; font-weight: 400; margin-left: 5px; }
+    .tier-cta { margin-top:8px; background:rgba(240,192,64,.12); color:#F0C040; border:1px solid rgba(240,192,64,.3); border-radius:8px; padding:7px; font-size:.78rem; font-weight:600; text-align:center; }
+    .tier-card:hover .tier-cta { background: rgba(240,192,64,.22); }
+    @media(max-width:440px){ .tiers-grid{ grid-template-columns:repeat(2,1fr); } }
+
+    /* ── LOGIN ── */
+    .login-card { background:rgba(255,255,255,.03); border:1px solid rgba(255,255,255,.09); border-radius:20px; padding:26px 22px; width:100%; max-width:460px; }
+    .login-form-inner { display:flex; flex-direction:column; gap:14px; margin-top:16px; }
+
+    /* ── MODAL ── */
+    .modal-overlay { display:none; position:fixed; inset:0; z-index:200; background:rgba(0,0,0,.8); backdrop-filter:blur(6px); align-items:center; justify-content:center; padding:16px; }
+    .modal-overlay.open { display:flex; }
+    .modal-box { background:#0e1628; border:1px solid rgba(240,192,64,.28); border-radius:20px; max-width:440px; width:100%; padding:28px; position:relative; max-height:92vh; overflow-y:auto; }
+    .modal-close { position:absolute;top:14px;right:14px;background:none;border:none;color:rgba(255,255,255,.5);font-size:1.4rem;cursor:pointer;line-height:1; }
+    .modal-close:hover { color:#fff; }
+
+    .form-label-sm { display:block; font-size:.78rem; font-weight:600; color:rgba(255,255,255,.55); letter-spacing:.07em; text-transform:uppercase; margin-bottom:6px; }
+    select.input-field { width:100%; background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.12); border-radius:10px; color:#fff; padding:12px 14px; font-size:.9rem; outline:none; font-family:'Poppins',sans-serif; }
+    select.input-field option { background:#0e1628; }
+    .network-chips { display:flex; flex-wrap:wrap; gap:8px; }
+    .net-chip { display:flex; align-items:center; gap:6px; padding:8px 14px; border-radius:100px; border:1.5px solid rgba(255,255,255,.15); background:rgba(255,255,255,.05); color:rgba(255,255,255,.8); font-size:.82rem; font-weight:600; cursor:pointer; transition:all .15s; }
+    .net-chip.selected { border-color:#F0C040; background:rgba(240,192,64,.12); color:#F0C040; }
+    .net-dot { width:9px; height:9px; border-radius:50%; }
+    .phone-row { display:flex; gap:10px; align-items:center; }
+    .phone-prefix { display:flex; align-items:center; gap:5px; background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.12); border-radius:10px; padding:11px 12px; font-size:.88rem; font-weight:600; color:#fff; white-space:nowrap; flex-shrink:0; }
+    .pay-err { background:rgba(239,68,68,.12); border:1px solid rgba(239,68,68,.3); border-radius:10px; padding:10px 14px; color:#FCA5A5; font-size:.82rem; display:flex; align-items:center; gap:8px; }
+    .hidden { display:none !important; }
+    .mt-2 { margin-top:8px; }
+
+    .section-title { color:#F0C040; font-size:1rem; font-weight:700; margin:0 0 4px; }
+    .section-sub { color:rgba(255,255,255,.5); font-size:.82rem; margin:0 0 2px; line-height:1.5; }
+    .loader-txt { text-align:center; padding:40px; color:rgba(255,255,255,.4); font-size:.88rem; }
+    .footer-note { text-align:center; color:rgba(255,255,255,.2); font-size:.72rem; margin-top:36px; }
+  </style>
 </head>
 <body class="login-page">
 
-  <!-- Arrière-plan animé -->
   <div class="bg-canvas"></div>
   <div class="grid-overlay"></div>
   <div class="stars" id="stars"></div>
 
-  <div class="login-wrapper">
-    <div class="login-card">
-
-      <div class="login-brand">
-        <div class="login-icon-wrap">
-          <img src="logo-sk.png" alt="Sossou Kouamé" class="login-logo-img" onerror="this.style.display='none';document.getElementById('login-icon-fallback').style.display='flex'">
-          <span class="login-icon" id="login-icon-fallback" style="display:none">💎</span>
-        </div>
-        <h1>Site de paiement<br>Sossou Kouamé<br><span style="font-size:.75em;letter-spacing:.12em;opacity:.85">Shopping Boutique</span></h1>
-        <p>Paiement rapide &amp; sécurisé</p>
+  <!-- ══════════════════════════════════════════
+       PAGE 0 — ACCUEIL (deux panneaux)
+  ══════════════════════════════════════════ -->
+  <div class="page active" id="pg-home">
+    <!-- Logo pleine largeur -->
+    <div class="logo-card">
+      <div class="logo-card-inner">
+        <img src="logo-sk.png" alt="Logo Sossou Kouamé"
+             onerror="this.closest('.logo-card').style.display='none'">
       </div>
+    </div>
+    <p style="color:rgba(255,255,255,.4);font-size:.82rem;margin:0 0 24px;letter-spacing:.04em">
+      Choisissez une option pour continuer
+    </p>
 
+    <div class="panels">
+      <button class="panel-btn panel-don" onclick="goto('don')">
+        <div class="panel-inner">
+          <div class="panel-icon">💖</div>
+          <div class="panel-text">
+            <h2>Soutenir le développeur</h2>
+            <p>Faire un don — aucun compte requis.<br>Choisissez votre palier et payez directement.</p>
+          </div>
+          <div class="panel-arrow">›</div>
+        </div>
+      </button>
+
+      <button class="panel-btn panel-serv" onclick="goto('login')">
+        <div class="panel-inner">
+          <div class="panel-icon">💳</div>
+          <div class="panel-text">
+            <h2>Payer un service</h2>
+            <p>Abonnements &amp; boutique — connexion requise.</p>
+          </div>
+          <div class="panel-arrow">›</div>
+        </div>
+      </button>
+    </div>
+
+    <p class="footer-note">© 2026 Sossou Kouamé Shopping Boutique — Tous droits réservés</p>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       PAGE 1 — SOUTIEN / DON
+  ══════════════════════════════════════════ -->
+  <div class="page" id="pg-don">
+    <div class="page-brand" style="max-width:520px">
+      <div class="page-brand-logo">
+        <img src="logo-sk.png" alt="Logo"
+             onerror="this.closest('.page-brand-logo').style.display='none'">
+      </div>
+      <h1>💖 Soutenir le développeur</h1>
+      <p>Aucun compte requis — choisissez un palier et payez via Mobile Money</p>
+    </div>
+
+    <div id="tiersLoader" class="loader-txt">Chargement des paliers…</div>
+    <div id="tiersGrid" class="tiers-grid" style="display:none"></div>
+
+    <p class="footer-note" style="margin-top:24px">Appuyez sur ← Retour pour revenir à l'accueil</p>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       PAGE 2 — CONNEXION
+  ══════════════════════════════════════════ -->
+  <div class="page" id="pg-login">
+    <div class="page-brand">
+      <div class="page-brand-logo">
+        <img src="logo-sk.png" alt="Logo"
+             onerror="this.closest('.page-brand-logo').style.display='none'">
+      </div>
+      <h1 style="color:#a5b4fc">💳 Connexion à votre compte</h1>
+      <p>Entrez vos identifiants pour accéder à vos abonnements et à la boutique</p>
+    </div>
+
+    <div class="login-card">
       <form id="loginForm" onsubmit="handleLogin(event)">
-        <div class="login-form">
+        <div class="login-form-inner">
           <div class="form-group">
-            <label for="username">Identifiant</label>
+            <label class="form-label-sm" for="username">Identifiant</label>
             <div class="input-wrapper">
               <svg class="input-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
               </svg>
-              <input type="text" id="username" placeholder="Entrez votre identifiant" autocomplete="username" required>
+              <input type="text" id="username" placeholder="Email ou nom d'utilisateur" autocomplete="username" required>
             </div>
           </div>
 
           <div class="form-group">
-            <label for="password">Mot de passe</label>
+            <label class="form-label-sm" for="password">Mot de passe</label>
             <div class="input-wrapper">
               <svg class="input-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
               </svg>
-              <input type="password" id="password" placeholder="Entrez votre mot de passe" autocomplete="current-password" required>
+              <input type="password" id="password" placeholder="Mot de passe" autocomplete="current-password" required>
               <button type="button" class="toggle-pwd" onclick="togglePwd()" tabindex="-1">
                 <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
@@ -61,95 +283,290 @@
             <span id="loginErrText"></span>
           </div>
 
-          <button type="submit" class="btn-login" id="loginBtn" style="margin-top:6px">
+          <button type="submit" class="btn-login" id="loginBtn">
             <span id="loginBtnTxt">Se connecter</span>
             <span class="btn-loader hidden" id="loginLoad"></span>
           </button>
         </div>
       </form>
+    </div>
 
-      <div class="login-divider"><span>✦ sécurisé par chiffrement ✦</span></div>
-      <p class="login-footer-note">© 2026 Sossou Kouamé Shopping Boutique — Tous droits réservés</p>
+    <p class="footer-note" style="margin-top:24px">Appuyez sur ← Retour pour revenir à l'accueil</p>
+  </div>
+
+  <!-- ══ MODAL PAIEMENT DON ══ -->
+  <div class="modal-overlay" id="payModal">
+    <div class="modal-box">
+      <button class="modal-close" onclick="closeModal()">✕</button>
+      <div style="font-size:2rem;margin-bottom:6px" id="modalIcon">💖</div>
+      <h3 id="modalTitle" style="color:#F0C040;font-size:1.1rem;margin:0 0 3px;padding-right:24px"></h3>
+      <p style="color:rgba(255,255,255,.5);font-size:.82rem;margin:0 0 4px">Soutien au développeur</p>
+      <div id="modalPrice" style="color:#10B981;font-weight:800;font-size:1.3rem;margin-bottom:18px"></div>
+
+      <!-- Nom -->
+      <div style="margin-bottom:14px">
+        <label class="form-label-sm">Votre nom (facultatif)</label>
+        <div class="input-wrapper" style="margin-top:0">
+          <input type="text" id="donorName" placeholder="Ex : Jean Dupont" style="padding-left:14px">
+        </div>
+      </div>
+
+      <!-- Pays -->
+      <div style="margin-bottom:14px">
+        <label class="form-label-sm">Pays</label>
+        <select id="countrySelect" class="input-field" onchange="onCountry()">
+          <option value="" disabled selected>Sélectionner un pays</option>
+        </select>
+      </div>
+
+      <!-- Réseau -->
+      <div id="netGrp" class="hidden mt-2" style="margin-bottom:14px">
+        <label class="form-label-sm">Réseau Mobile Money</label>
+        <div class="network-chips" id="netChips"></div>
+      </div>
+
+      <!-- Téléphone -->
+      <div id="phoneGrp" class="hidden mt-2" style="margin-bottom:14px">
+        <label class="form-label-sm">Numéro à débiter</label>
+        <div class="phone-row">
+          <div class="phone-prefix">
+            <span id="flag">🌍</span>
+            <span id="code">+</span>
+          </div>
+          <div class="input-wrapper" style="flex:1;margin:0">
+            <input type="tel" id="phoneInput" placeholder="Ex: 20 21 12 34" maxlength="15" oninput="chkPay()" style="padding-left:14px">
+          </div>
+        </div>
+      </div>
+
+      <div id="payErr" class="pay-err hidden mt-2" style="margin-bottom:10px">
+        <span>⚠</span><span id="payErrTxt"></span>
+      </div>
+
+      <button id="btnPay" onclick="doPay()" class="btn-primary hidden" style="width:100%">
+        <span id="btnPayTxt">💳 Payer maintenant</span>
+        <span class="btn-loader hidden" id="payLoad"></span>
+      </button>
     </div>
   </div>
 
   <script>
-    // Étoiles
+    // ── ÉTOILES ──
     (function(){
-      const c = document.getElementById('stars');
+      const c=document.getElementById('stars');
       for(let i=0;i<80;i++){
-        const s = document.createElement('div');
-        s.className = 'star';
-        const sz = Math.random()*2+1;
-        s.style.cssText = `width:${sz}px;height:${sz}px;top:${Math.random()*100}%;left:${Math.random()*100}%;--dur:${2+Math.random()*4}s;--delay:${Math.random()*4}s`;
+        const s=document.createElement('div'); s.className='star';
+        const sz=Math.random()*2+1;
+        s.style.cssText=`width:${sz}px;height:${sz}px;top:${Math.random()*100}%;left:${Math.random()*100}%;--dur:${2+Math.random()*4}s;--delay:${Math.random()*4}s`;
         c.appendChild(s);
       }
     })();
 
-    // Auth check
+    // ── Auth check ──
     fetch('/api/me').then(r=>{ if(r.ok) window.location.href='/dashboard.html'; }).catch(()=>{});
 
+    // ── ROUTEUR (History API) ──
+    const PAGES = { home:'pg-home', don:'pg-don', login:'pg-login' };
+    let current = 'home';
+
+    function showPage(name) {
+      Object.values(PAGES).forEach(id => document.getElementById(id).classList.remove('active'));
+      document.getElementById(PAGES[name] || PAGES.home).classList.add('active');
+      current = name;
+      window.scrollTo(0,0);
+      if(name==='don') loadTiers();
+    }
+
+    function goto(name) {
+      history.pushState({ page: name }, '', '#' + name);
+      showPage(name);
+    }
+
+    window.addEventListener('popstate', e => {
+      const p = (e.state && e.state.page) || 'home';
+      showPage(p);
+    });
+
+    // Gérer le rechargement avec hash
+    (function(){
+      const hash = location.hash.replace('#','');
+      if(hash && PAGES[hash]) {
+        history.replaceState({ page: hash }, '', '#' + hash);
+        showPage(hash);
+      } else {
+        history.replaceState({ page: 'home' }, '', location.pathname);
+        showPage('home');
+      }
+    })();
+
+    // ── PALIERS ──
+    let tiersLoaded = false;
+    const COUNTRIES = {
+      bj:{name:'Bénin',         flag:'🇧🇯',code:'+229',nets:[{k:'mtn',n:'MTN',c:'#FFCC00'},{k:'moov',n:'Moov',c:'#FF6600'},{k:'celtiis',n:'Celtiis',c:'#00A859'}]},
+      ci:{name:"Côte d'Ivoire", flag:'🇨🇮',code:'+225',nets:[{k:'mtn',n:'MTN',c:'#FFCC00'},{k:'orange',n:'Orange',c:'#FF6600'},{k:'moov',n:'Moov',c:'#0066CC'},{k:'wave',n:'Wave',c:'#1CE5BD'}]},
+      bf:{name:'Burkina Faso',  flag:'🇧🇫',code:'+226',nets:[{k:'orange',n:'Orange',c:'#FF6600'},{k:'moov',n:'Moov',c:'#0066CC'}]},
+      tg:{name:'Togo',          flag:'🇹🇬',code:'+228',nets:[{k:'tmoney',n:'T-Money',c:'#0066CC'},{k:'moov',n:'Moov',c:'#FF6600'}]},
+      sn:{name:'Sénégal',       flag:'🇸🇳',code:'+221',nets:[{k:'orange',n:'Orange',c:'#FF6600'},{k:'wave',n:'Wave',c:'#1CE5BD'},{k:'free',n:'Free',c:'#DA291C'}]},
+      ml:{name:'Mali',          flag:'🇲🇱',code:'+223',nets:[{k:'orange',n:'Orange',c:'#FF6600'},{k:'moov',n:'Moov',c:'#0066CC'}]},
+      gh:{name:'Ghana',         flag:'🇬🇭',code:'+233',nets:[{k:'mtn',n:'MTN',c:'#FFCC00'},{k:'vodafone',n:'Vodafone',c:'#E60000'}]},
+      ng:{name:'Nigeria',       flag:'🇳🇬',code:'+234',nets:[{k:'mtn',n:'MTN',c:'#FFCC00'},{k:'airtel',n:'Airtel',c:'#E60000'}]},
+      cm:{name:'Cameroun',      flag:'🇨🇲',code:'+237',nets:[{k:'mtn',n:'MTN',c:'#FFCC00'},{k:'orange',n:'Orange',c:'#FF6600'}]},
+      fr:{name:'France',        flag:'🇫🇷',code:'+33', nets:[{k:'orange',n:'Orange',c:'#FF6600'}]},
+    };
+    let selTier=null, selCountry=null, selNet=null;
+
+    function tierIcon(p){ return p>=100000?'👑':p>=50000?'🏆':p>=25000?'💎':p>=10000?'⭐':p>=5000?'🥇':p>=2000?'🥈':p>=1000?'🥉':'💖'; }
+    function tierBadge(p){
+      if(p>=100000) return {t:'Mythique',c:'#EC4899'};
+      if(p>=50000)  return {t:'Prestige', c:'#8B5CF6'};
+      if(p>=25000)  return {t:'Diamant',  c:'#06B6D4'};
+      if(p>=10000)  return {t:'Or+',      c:'#F0C040'};
+      if(p>=5000)   return {t:'Argent+',  c:'#94A3B8'};
+      if(p>=1000)   return {t:'Bronze',   c:'#F97316'};
+      return null;
+    }
+
+    async function loadTiers(){
+      if(tiersLoaded) return;
+      try{
+        const r = await fetch('/api/support-tiers');
+        const d = await r.json();
+        const g = document.getElementById('tiersGrid');
+        g.innerHTML = '';
+        (d.tiers||[]).forEach(t=>{
+          const b = tierBadge(t.price_xof);
+          const usd = (t.price_xof/650).toFixed(2);
+          const el = document.createElement('div');
+          el.className = 'tier-card';
+          el.onclick = ()=>openModal(t);
+          el.innerHTML=`
+            ${b?`<div class="tier-badge" style="background:${b.c}22;color:${b.c};border:1px solid ${b.c}44">${b.t}</div>`:''}
+            <div class="tier-icon">${tierIcon(t.price_xof)}</div>
+            <div class="tier-label">${t.label}</div>
+            <div class="tier-price">${Number(t.price_xof).toLocaleString('fr-FR')} FCFA<small>≈ $${usd}</small></div>
+            <div class="tier-cta">💳 Soutenir</div>
+          `;
+          g.appendChild(el);
+        });
+        document.getElementById('tiersLoader').style.display='none';
+        g.style.display='grid';
+        tiersLoaded = true;
+      }catch(e){
+        document.getElementById('tiersLoader').textContent='Erreur de chargement. Vérifiez votre connexion.';
+      }
+    }
+
+    function openModal(tier){
+      selTier=tier; selCountry=null; selNet=null;
+      document.getElementById('modalIcon').textContent=tierIcon(tier.price_xof);
+      document.getElementById('modalTitle').textContent=tier.label;
+      document.getElementById('modalPrice').textContent=Number(tier.price_xof).toLocaleString('fr-FR')+' FCFA';
+      document.getElementById('donorName').value='';
+      const sel=document.getElementById('countrySelect');
+      sel.innerHTML='<option value="" disabled selected>Sélectionner un pays</option>';
+      Object.entries(COUNTRIES).forEach(([k,v])=>{
+        const o=document.createElement('option'); o.value=k;
+        o.textContent=`${v.flag} ${v.name}`; sel.appendChild(o);
+      });
+      document.getElementById('netGrp').classList.add('hidden');
+      document.getElementById('phoneGrp').classList.add('hidden');
+      document.getElementById('phoneInput').value='';
+      document.getElementById('btnPay').classList.add('hidden');
+      document.getElementById('payErr').classList.add('hidden');
+      document.getElementById('payModal').classList.add('open');
+    }
+    function closeModal(){ document.getElementById('payModal').classList.remove('open'); selTier=null; }
+
+    function onCountry(){
+      const k=document.getElementById('countrySelect').value;
+      selCountry=COUNTRIES[k]; selNet=null;
+      if(!selCountry) return;
+      document.getElementById('flag').textContent=selCountry.flag;
+      document.getElementById('code').textContent=selCountry.code;
+      const box=document.getElementById('netChips'); box.innerHTML='';
+      selCountry.nets.forEach(net=>{
+        const d=document.createElement('div'); d.className='net-chip';
+        d.innerHTML=`<span class="net-dot" style="background:${net.c}"></span>${net.n}`;
+        d.onclick=()=>{
+          selNet=net;
+          document.querySelectorAll('#netChips .net-chip').forEach(c=>c.classList.remove('selected'));
+          d.classList.add('selected');
+          chkPay();
+        };
+        box.appendChild(d);
+      });
+      document.getElementById('netGrp').classList.remove('hidden');
+      document.getElementById('phoneGrp').classList.remove('hidden');
+      chkPay();
+    }
+
+    function chkPay(){
+      const phone=(document.getElementById('phoneInput').value||'').trim();
+      document.getElementById('btnPay').classList.toggle('hidden', !(selNet&&selCountry&&phone.length>=8));
+    }
+
+    async function doPay(){
+      if(!selTier) return;
+      const btn=document.getElementById('btnPay'), txt=document.getElementById('btnPayTxt');
+      const ld=document.getElementById('payLoad'), err=document.getElementById('payErr');
+      const etx=document.getElementById('payErrTxt');
+      btn.disabled=true; txt.textContent='Ouverture…'; ld.classList.remove('hidden'); err.classList.add('hidden');
+      const rawPhone = document.getElementById('phoneInput').value.trim().replace(/\s/g,'');
+      const nom=(document.getElementById('donorName').value||'').trim()||'Donateur';
+      // Format Money Fusion : code pays sans "+" + numéro local complet (avec le 0 initial)
+      // En Bénin les numéros commencent par 01 : c'est partie du numéro, pas un préfixe trunk
+      const codeDigits = selCountry.code.replace('+','');
+      const numeroSend = codeDigits + rawPhone;
+      try{
+        const r=await fetch('/api/create-support-public',{
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({ tier_id:selTier.id, numeroSend, nomclient:nom })
+        });
+        const d=await r.json();
+        if(d.url){ window.location.href=d.url; return; }
+        if(d.statut===true||d.success===true){
+          closeModal();
+          window.location.href=`/success.html?req=${d.payment_req_id}&type=support`;
+        } else {
+          etx.textContent=d.message||d.error||'Erreur lors du paiement';
+          err.classList.remove('hidden');
+          btn.disabled=false; txt.textContent='💳 Payer maintenant'; ld.classList.add('hidden');
+        }
+      }catch{
+        etx.textContent='Erreur réseau. Réessayez.';
+        err.classList.remove('hidden');
+        btn.disabled=false; txt.textContent='💳 Payer maintenant'; ld.classList.add('hidden');
+      }
+    }
+
+    // ── LOGIN ──
     async function handleLogin(e){
       e.preventDefault();
-      const btn=document.getElementById('loginBtn');
-      const txt=document.getElementById('loginBtnTxt');
-      const ld =document.getElementById('loginLoad');
-      const err=document.getElementById('loginErr');
+      const btn=document.getElementById('loginBtn'), txt=document.getElementById('loginBtnTxt');
+      const ld=document.getElementById('loginLoad'), err=document.getElementById('loginErr');
       const etx=document.getElementById('loginErrText');
-
-      btn.disabled=true; txt.textContent='Connexion…'; ld.classList.remove('hidden');
-      err.classList.add('hidden');
-
-      try {
-        const r = await fetch('/api/login',{
+      btn.disabled=true; txt.textContent='Connexion…'; ld.classList.remove('hidden'); err.classList.add('hidden');
+      try{
+        const r=await fetch('/api/login',{
           method:'POST', headers:{'Content-Type':'application/json'},
-          body:JSON.stringify({
-            username: document.getElementById('username').value.trim(),
-            password: document.getElementById('password').value
-          })
+          body:JSON.stringify({ username:document.getElementById('username').value.trim(), password:document.getElementById('password').value })
         });
-        const d = await r.json();
-        if(r.ok && d.success){
+        const d=await r.json();
+        if(r.ok&&d.success){
           txt.textContent='✓ Bienvenue !';
-          setTimeout(()=>window.location.href='/dashboard.html', 400);
+          setTimeout(()=>window.location.href='/dashboard.html',400);
         } else {
-          etx.textContent = d.error || 'Erreur de connexion';
+          etx.textContent=d.error||'Identifiant ou mot de passe incorrect';
           err.classList.remove('hidden');
           btn.disabled=false; txt.textContent='Se connecter'; ld.classList.add('hidden');
-          document.querySelector('.login-card').style.animation='shake .4s ease';
-          setTimeout(()=>document.querySelector('.login-card').style.animation='',500);
         }
-      } catch {
+      }catch{
         etx.textContent='Erreur réseau. Vérifiez votre connexion.';
         err.classList.remove('hidden');
         btn.disabled=false; txt.textContent='Se connecter'; ld.classList.add('hidden');
       }
     }
-
-    function togglePwd(){
-      const i=document.getElementById('password');
-      i.type = i.type==='password' ? 'text' : 'password';
-    }
+    function togglePwd(){ const i=document.getElementById('password'); i.type=i.type==='password'?'text':'password'; }
   </script>
-
-  <style>
-    @keyframes shake {
-      0%,100%{transform:translateX(0)}
-      20%,60%{transform:translateX(-6px)}
-      40%,80%{transform:translateX(6px)}
-    }
-    .login-logo-img {
-      width: 80px;
-      height: 80px;
-      object-fit: contain;
-      filter: drop-shadow(0 0 16px rgba(255,200,60,0.55));
-      border-radius: 50%;
-    }
-    .login-brand h1 {
-      font-size: 1.25rem !important;
-      line-height: 1.35 !important;
-      text-align: center;
-    }
-  </style>
 </body>
 </html>

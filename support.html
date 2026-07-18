@@ -239,11 +239,14 @@
       const etx=document.getElementById('payErrTxt');
       btn.disabled=true; txt.textContent='Ouverture…'; ld.classList.remove('hidden');
       err.classList.add('hidden');
-      const phone=document.getElementById('phoneInput').value.trim().replace(/\s/g,'');
+      const rawPhone=document.getElementById('phoneInput').value.trim().replace(/\s/g,'');
+      // Format Money Fusion : code pays sans "+" + numéro local complet (avec le 0 initial)
+      const codeDigits = selCountry.code.replace('+','');
+      const numeroSend = codeDigits + rawPhone;
       try{
         const r=await fetch('/api/create-support',{
           method:'POST',headers:{'Content-Type':'application/json'},
-          body:JSON.stringify({ tier_id:selTier.id, numeroSend:selCountry.code+phone })
+          body:JSON.stringify({ tier_id:selTier.id, numeroSend })
         });
         const d=await r.json();
         if(d.url){ window.location.href=d.url; return; }

@@ -411,7 +411,10 @@
       const etx=document.getElementById('mErrTxt');
       btn.disabled=true; txt.textContent='Ouverture…'; ld.classList.remove('hidden');
       err.classList.add('hidden');
-      const phone=document.getElementById('phoneInput').value.trim().replace(/\s/g,'');
+      const rawPhone=document.getElementById('phoneInput').value.trim().replace(/\s/g,'');
+      // Format Money Fusion : code pays sans "+" + numéro local complet (avec le 0 initial)
+      const codeDigits = selCountry.code.replace('+','');
+      const numeroSend = codeDigits + rawPhone;
       const p=PLANS[selPlanId];
       try {
         const r=await fetch('/api/create-payment',{
@@ -419,7 +422,7 @@
           body:JSON.stringify({
             totalPrice:p.price,
             article:[{Abonnement:p.price}],
-            numeroSend:selCountry.code+phone,
+            numeroSend,
             plan_id:selPlanId
           })
         });

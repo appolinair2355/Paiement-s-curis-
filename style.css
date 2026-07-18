@@ -106,7 +106,7 @@ body {
 .logo-link {
   display:flex; align-items:center; gap:12px; text-decoration:none;
 }
-.logo-img { height:38px; width:38px; border-radius:50%; object-fit:contain; }
+.logo-img { height:38px; width:auto; border-radius:8px; object-fit:contain; background:#fff; padding:3px 6px; }
 .logo-text {
   font-size:1rem; font-weight:800; letter-spacing:2px;
   background: linear-gradient(135deg, var(--gold), var(--gold2));
