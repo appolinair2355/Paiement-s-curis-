@@ -537,6 +537,15 @@
 
     let pollInterval = null;
 
+    async function notifyTimeout(payReqId, context) {
+      try {
+        await fetch('/api/notify-timeout', {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ payment_req_id: payReqId, context })
+        });
+      } catch(e) {}
+    }
+
     function showWaitScreen(payReqId, type) {
       document.getElementById('btnPay').classList.add('hidden');
       document.getElementById('payErr').classList.add('hidden');
@@ -547,11 +556,12 @@
       });
       document.getElementById('waitScreen').classList.remove('hidden');
       let attempts = 0;
-      const maxAttempts = 60;
+      const TIMEOUT_AT = 20; // 20×5s = 100s
       pollInterval = setInterval(async () => {
         attempts++;
         const st = document.getElementById('waitStatus');
-        if(st) st.textContent = `Vérification en cours… (${attempts})`;
+        const secs = attempts * 5;
+        if(st) st.textContent = `Vérification en cours… (${secs}s)`;
         try {
           const r = await fetch(`/api/poll-payment/${payReqId}`);
           const d = await r.json();
@@ -561,9 +571,11 @@
           } else if (d.status === 'failed') {
             clearInterval(pollInterval);
             if(st) st.textContent = '❌ Paiement échoué ou annulé. Réessayez.';
-          } else if (attempts >= maxAttempts) {
+          } else if (attempts === TIMEOUT_AT) {
             clearInterval(pollInterval);
-            if(st) st.textContent = '⏱ Délai dépassé. Vérifiez votre téléphone ou réessayez.';
+            await notifyTimeout(payReqId, 'Soutien développeur');
+            if(st) st.textContent = '⏱ Paiement non confirmé après 100s. Fermeture…';
+            setTimeout(() => { closeModal(); }, 3000);
           }
         } catch(e) { /* continue */ }
       }, 5000);

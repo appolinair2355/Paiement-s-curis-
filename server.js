@@ -3,33 +3,94 @@
 // Login + Dashboard + Paiement Money Fusion + Crypto + BDD Render
 // ============================================================
 
-const express  = require("express");
-const path     = require("path");
-const { Pool } = require("pg");
-const bcrypt   = require("bcrypt");
-const session  = require("express-session");
+const express    = require("express");
+const path       = require("path");
+const { Pool }   = require("pg");
+const bcrypt     = require("bcrypt");
+const session    = require("express-session");
+const nodemailer = require("nodemailer");
 
 const app  = express();
 const PORT = process.env.PORT || 5000;
 
 // ─── BASE DE DONNÉES ──────────────────────────────────────────────────────
 const pool = new Pool({
-  connectionString: "postgresql://bonjour_user:WzeZsFKlKWU180iOFxngBEaThdG1kKUR@dpg-d962464s728c73e8p250-a.oregon-postgres.render.com/bonjour",
+  connectionString: 'postgresql://bonjour_user:WzeZsFKlKWU180iOFxngBEaThdG1kKUR@dpg-d962464s728c73e8p250-a.oregon-postgres.render.com/bonjour',
   ssl: { rejectUnauthorized: false }
 });
+
+// ─── EMAIL (nodemailer / Gmail) ───────────────────────────────────────────
+const gmailTransport = nodemailer.createTransport({
+  service: "gmail",
+  auth: {
+    user: 'sossoukouam@gmail.com',
+    pass: 'gcwbgdpqntabwlud',
+  },
+});
+
+async function sendPaymentEmail(userId, details) {
+  if (!'sossoukouam@gmail.com' || !'gcwbgdpqntabwlud') return;
+  try {
+    const r = await pool.query(
+      "SELECT username, first_name, last_name, email FROM users WHERE id = $1",
+      [userId]
+    );
+    if (!r.rows.length) return;
+    const u = r.rows[0];
+    const toEmail = u.email || `${u.username}@gmail.com`;
+    const name = [u.first_name, u.last_name].filter(Boolean).join(" ") || u.username;
+    const subject = `✅ Paiement confirmé — ${details.label}`;
+    const html = `
+<div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;background:#0a0f1e;color:#fff;border-radius:12px;overflow:hidden">
+  <div style="background:linear-gradient(135deg,#F0C040,#C9A030);padding:28px 32px;text-align:center">
+    <h1 style="margin:0;font-size:1.4rem;color:#000">Sossou Kouamé Shopping Boutique</h1>
+  </div>
+  <div style="padding:32px">
+    <h2 style="color:#F0C040;margin-top:0">Bonjour ${name} 👋</h2>
+    <p style="color:rgba(255,255,255,0.8);font-size:1rem;line-height:1.6">
+      Votre paiement a bien été <strong style="color:#10B981">confirmé et validé</strong>.<br>
+      Merci pour votre confiance !
+    </p>
+    <div style="background:rgba(255,255,255,0.06);border:1px solid rgba(240,192,64,0.3);border-radius:10px;padding:20px;margin:20px 0">
+      <table style="width:100%;border-collapse:collapse;font-size:.92rem">
+        <tr><td style="color:rgba(255,255,255,0.5);padding:6px 0">Service</td><td style="color:#fff;font-weight:700;text-align:right">${details.label}</td></tr>
+        ${details.amount ? `<tr><td style="color:rgba(255,255,255,0.5);padding:6px 0">Montant</td><td style="color:#F0C040;font-weight:700;text-align:right">${details.amount}</td></tr>` : ""}
+        ${details.duration ? `<tr><td style="color:rgba(255,255,255,0.5);padding:6px 0">Durée</td><td style="color:#fff;text-align:right">${details.duration}</td></tr>` : ""}
+        <tr><td style="color:rgba(255,255,255,0.5);padding:6px 0">Statut</td><td style="color:#10B981;font-weight:700;text-align:right">✓ Validé</td></tr>
+      </table>
+    </div>
+    <p style="color:rgba(255,255,255,0.6);font-size:.88rem">
+      Pour toute question, répondez à cet email ou contactez-nous directement.
+    </p>
+    <div style="text-align:center;margin-top:24px">
+      <span style="color:#F0C040;font-size:.8rem">© 2026 Sossou Kouamé Shopping Boutique</span>
+    </div>
+  </div>
+</div>`;
+    await gmailTransport.sendMail({
+      from: `"Sossou Kouamé" <${'sossoukouam@gmail.com'}>`,
+      to: toEmail,
+      subject,
+      html,
+    });
+    console.log("[EMAIL] Envoyé à", toEmail);
+  } catch (e) {
+    console.error("[EMAIL-ERR]", e.message);
+  }
+}
 
 // ─── MONEY FUSION ─────────────────────────────────────────────────────────
 const CONFIG = {
   API_URL:    "https://pay.moneyfusion.net/Paiements_m/7da7654df194be93/pay/",
   STATUS_URL: "https://pay.moneyfusion.net/paiementNotif",
-  API_KEY:    "moneyfusion_v1_69777b802181d4ebf71e2bde_9F8AA2BB17ED57E9EE1835A9C1AEE6A03012A677E40C93636A5458C6AE798852",
+  API_KEY:    'moneyfusion_v1_69777b802181d4ebf71e2bde_9F8AA2BB17ED57E9EE1835A9C1AEE6A03012A677E40C93636A5458C6AE798852',
 };
 
 // ─── PLANS D'ABONNEMENT (lus depuis la BDD en temps réel) ────────────────
 const DEFAULT_PLANS = [
-  { id: "1j",  label: "1 Jour",   duration_minutes:  1440, amount_usd:  1.00, price_xof:   656 },
-  { id: "7j",  label: "7 Jours",  duration_minutes: 10080, amount_usd:  7.00, price_xof:  4592 },
-  { id: "30j", label: "30 Jours", duration_minutes: 43200, amount_usd: 30.00, price_xof: 19680 },
+  { id: "1j",  label: "1 Jour",    duration_minutes:  1440, amount_usd:  1.08, price_xof:   656, price_eur:  1 },
+  { id: "15j", label: "15 Jours",  duration_minutes: 21600, amount_usd: 12.96, price_xof:  7872, price_eur: 12 },
+  { id: "30j", label: "30 Jours",  duration_minutes: 43200, amount_usd: 32.40, price_xof: 19680, price_eur: 30 },
 ];
 
 async function getPlans() {
@@ -110,7 +171,7 @@ async function getExchangeRates() {
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(session({
-  secret: process.env.SESSION_SECRET || "sossou-secret-2024",
+  secret: 'sossou-secret-2024',
   resave: false,
   saveUninitialized: false,
   cookie: { secure: false, maxAge: 24 * 60 * 60 * 1000 }
@@ -558,6 +619,60 @@ app.get("/api/poll-payment/:payReqId", async (req, res) => {
   }
 });
 
+// ─── ROUTE: Notifier paiement non validé après timeout ───────────────────
+app.post("/api/notify-timeout", async (req, res) => {
+  const { payment_req_id, context } = req.body;
+  try {
+    let details = { label: context || "Paiement inconnu", amount: null, user: "Inconnu" };
+    if (payment_req_id) {
+      const r = await pool.query(
+        `SELECT pr.plan_label, pr.amount_usd, pr.payment_method, pr.phone_number,
+                u.username, u.first_name, u.last_name
+         FROM payment_requests pr
+         LEFT JOIN users u ON u.id = pr.user_id
+         WHERE pr.id = $1`, [payment_req_id]
+      );
+      if (r.rows.length) {
+        const row = r.rows[0];
+        details.label  = row.plan_label || "Paiement";
+        details.amount = Math.round((row.amount_usd || 0) * 656);
+        details.method = row.payment_method;
+        details.phone  = row.phone_number;
+        details.user   = [row.first_name, row.last_name].filter(Boolean).join(" ") || row.username || "Invité";
+      }
+    }
+    const adminEmail = 'sossoukouam@gmail.com' || "sossoukouam@gmail.com";
+    const html = `
+<div style="font-family:Arial,sans-serif;max-width:560px;background:#1a0a0a;color:#fff;border-radius:12px;overflow:hidden">
+  <div style="background:#EF4444;padding:20px 28px">
+    <h2 style="margin:0;color:#fff">⚠️ Paiement non validé — Alerte</h2>
+  </div>
+  <div style="padding:28px">
+    <p style="color:rgba(255,255,255,.8)">Un paiement n'a <strong>pas été confirmé</strong> après 100 secondes.</p>
+    <table style="width:100%;border-collapse:collapse;font-size:.9rem;margin-top:12px">
+      <tr><td style="color:rgba(255,255,255,.5);padding:5px 0">Réf. paiement</td><td style="color:#fff;text-align:right">#${payment_req_id || '—'}</td></tr>
+      <tr><td style="color:rgba(255,255,255,.5);padding:5px 0">Service</td><td style="color:#fff;text-align:right">${details.label}</td></tr>
+      ${details.amount ? `<tr><td style="color:rgba(255,255,255,.5);padding:5px 0">Montant</td><td style="color:#F0C040;font-weight:700;text-align:right">${details.amount.toLocaleString('fr-FR')} XOF</td></tr>` : ""}
+      ${details.method ? `<tr><td style="color:rgba(255,255,255,.5);padding:5px 0">Méthode</td><td style="color:#fff;text-align:right">${details.method}</td></tr>` : ""}
+      ${details.phone  ? `<tr><td style="color:rgba(255,255,255,.5);padding:5px 0">Téléphone</td><td style="color:#fff;text-align:right">${details.phone}</td></tr>` : ""}
+      <tr><td style="color:rgba(255,255,255,.5);padding:5px 0">Client</td><td style="color:#fff;text-align:right">${details.user}</td></tr>
+    </table>
+    <p style="margin-top:20px;color:rgba(255,255,255,.6);font-size:.85rem">Vérifiez le panneau d'administration pour valider ou annuler ce paiement.</p>
+  </div>
+</div>`;
+    await gmailTransport.sendMail({
+      from: `"Sossou Kouamé Alerte" <${adminEmail}>`,
+      to: adminEmail,
+      subject: `⚠️ Paiement non validé #${payment_req_id || '?'} — ${details.label}`,
+      html,
+    });
+    console.log("[TIMEOUT-NOTIFY] Alerte envoyée pour paiement", payment_req_id);
+  } catch (e) {
+    console.error("[TIMEOUT-NOTIFY-ERR]", e.message);
+  }
+  res.json({ ok: true });
+});
+
 // ─── ROUTE: IP du serveur ─────────────────────────────────────────────────
 app.get("/my-ip", async (req, res) => {
   try {
@@ -599,21 +714,39 @@ async function activateSubscription(pr) {
     [pr.id]
   );
 
+  const pid = String(pr.plan_id);
+
   // Soutien au développeur → pas d'abonnement à activer
-  if (String(pr.plan_id).startsWith("sup_")) {
+  if (pid.startsWith("sup_")) {
+    if (pr.user_id && pr.user_id > 0) {
+      await sendPaymentEmail(pr.user_id, { label: pr.plan_label, amount: null });
+    }
+    return;
+  }
+
+  // Service Telegram / Maintenance → email uniquement
+  if (pid.startsWith("telegram_") || pid.startsWith("maintenance_")) {
+    const amtXof = Math.round((pr.amount_usd || 0) * 656);
+    const amtStr = amtXof > 0 ? `${amtXof.toLocaleString("fr-FR")} XOF` : null;
+    if (pr.user_id && pr.user_id > 0) {
+      await sendPaymentEmail(pr.user_id, { label: pr.plan_label, amount: amtStr });
+    }
     return;
   }
 
   // Achat boutique (idée ou stratégie) → pas d'abonnement à activer
-  if (String(pr.plan_id).startsWith("idea_") || String(pr.plan_id).startsWith("strat_")) {
-    if (String(pr.plan_id).startsWith("idea_")) {
-      const idea_id = parseInt(String(pr.plan_id).replace("idea_", ""), 10);
+  if (pid.startsWith("idea_") || pid.startsWith("strat_")) {
+    if (pid.startsWith("idea_")) {
+      const idea_id = parseInt(pid.replace("idea_", ""), 10);
       await pool.query(
         `INSERT INTO strategy_idea_purchases
            (user_id, idea_id, idea_name, amount_usd, status, created_at)
          VALUES ($1, $2, $3, $4, 'validated', NOW())`,
         [pr.user_id, idea_id, pr.plan_label, pr.amount_usd]
       ).catch(err => console.error("[IDEA-PURCHASE]", err.message));
+    }
+    if (pr.user_id && pr.user_id > 0) {
+      await sendPaymentEmail(pr.user_id, { label: pr.plan_label, amount: null });
     }
     return;
   }
@@ -633,8 +766,117 @@ async function activateSubscription(pr) {
     "UPDATE users SET subscription_expires_at = $1, is_premium = true WHERE id = $2",
     [newExpiry, pr.user_id]
   );
+
+  const mins = pr.duration_minutes || 0;
+  const days = Math.floor(mins / 1440);
+  const hrs  = Math.floor((mins % 1440) / 60);
+  let durStr = days > 0 ? `${days} jour${days > 1 ? "s" : ""}` : "";
+  if (hrs > 0) durStr += (durStr ? " " : "") + `${hrs}h`;
+  const amtXof = Math.round((pr.amount_usd || 0) * 656);
+  if (pr.user_id && pr.user_id > 0) {
+    await sendPaymentEmail(pr.user_id, {
+      label: pr.plan_label,
+      amount: amtXof > 0 ? `${amtXof.toLocaleString("fr-FR")} XOF` : null,
+      duration: durStr || null,
+    });
+  }
 }
 
+
+// ─── ROUTE: Paiement service personnalisé (Telegram / Maintenance) ────────
+app.post("/api/create-service-payment", requireAuth, async (req, res) => {
+  const { service_type, description, amount_xof, numeroSend } = req.body;
+
+  if (!service_type || !["telegram", "maintenance"].includes(service_type))
+    return res.status(400).json({ error: "Type de service invalide" });
+  if (!amount_xof || Number(amount_xof) <= 0)
+    return res.status(400).json({ error: "Montant invalide" });
+  if (!numeroSend || String(numeroSend).trim().length < 8)
+    return res.status(400).json({ error: "Numéro de téléphone requis (min 8 chiffres)" });
+
+  const label = service_type === "telegram" ? "Service Telegram" : "Service de Maintenance";
+  const labelFull = description ? `${label} — ${description}` : label;
+  const amount_usd = parseFloat((Number(amount_xof) / 656).toFixed(2));
+  const plan_id    = `${service_type}_custom`;
+
+  try {
+    const userRes = await pool.query(
+      "SELECT first_name, last_name, username FROM users WHERE id = $1",
+      [req.session.userId]
+    );
+    const u = userRes.rows[0];
+    const nomclient = [u.first_name, u.last_name].filter(Boolean).join(" ") || u.username;
+
+    const dbRes = await pool.query(
+      `INSERT INTO payment_requests
+         (user_id, plan_id, plan_label, amount_usd, duration_minutes, payment_method, status, phone_number)
+       VALUES ($1,$2,$3,$4,0,'mobile_money','pending',$5) RETURNING id`,
+      [req.session.userId, plan_id, labelFull, amount_usd, String(numeroSend).trim()]
+    );
+    const payReqId = dbRes.rows[0].id;
+
+    const origin     = req.headers.origin || `http://localhost:${PORT}`;
+    const return_url = `${origin}/success.html?req=${payReqId}&type=service`;
+
+    const paymentData = {
+      totalPrice: parseInt(amount_xof, 10),
+      article:    [{ [labelFull]: parseInt(amount_xof, 10) }],
+      numeroSend: String(numeroSend).trim(),
+      nomclient,
+      return_url,
+    };
+
+    console.log("[SERVICE-PAY] Appel Money Fusion:", JSON.stringify(paymentData));
+    const mfRes  = await fetch(CONFIG.API_URL, {
+      method:  "POST",
+      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${CONFIG.API_KEY}` },
+      body: JSON.stringify(paymentData),
+    });
+    const data = await mfRes.json();
+    console.log("[SERVICE-PAY] Réponse:", JSON.stringify(data));
+
+    const mfToken = data.token || data.tokenPay || null;
+    if (mfToken) {
+      await pool.query(
+        "UPDATE payment_requests SET transaction_id = $1 WHERE id = $2",
+        [mfToken, payReqId]
+      );
+    }
+    res.json({ ...data, payment_req_id: payReqId });
+  } catch (err) {
+    console.error("[SERVICE-PAY]", err);
+    res.status(500).json({ error: "Erreur serveur — réessaie plus tard" });
+  }
+});
+
+// ─── ROUTE: Paiement service Crypto (Telegram / Maintenance) ─────────────
+app.post("/api/create-service-payment-crypto", requireAuth, async (req, res) => {
+  const { service_type, description, amount_xof, crypto_id, transaction_hash } = req.body;
+
+  if (!service_type || !["telegram", "maintenance"].includes(service_type))
+    return res.status(400).json({ error: "Type de service invalide" });
+  if (!amount_xof || Number(amount_xof) <= 0)
+    return res.status(400).json({ error: "Montant invalide" });
+
+  const label = service_type === "telegram" ? "Service Telegram" : "Service de Maintenance";
+  const labelFull = description ? `${label} — ${description}` : label;
+  const amount_usd = parseFloat((Number(amount_xof) / 656).toFixed(2));
+  const plan_id    = `${service_type}_custom`;
+
+  try {
+    const dbRes = await pool.query(
+      `INSERT INTO payment_requests
+         (user_id, plan_id, plan_label, amount_usd, duration_minutes,
+          payment_method, status, transaction_id)
+       VALUES ($1,$2,$3,$4,0,'crypto','awaiting_screenshot',$5) RETURNING id`,
+      [req.session.userId, plan_id, labelFull, amount_usd, transaction_hash || null]
+    );
+    res.json({ success: true, payment_req_id: dbRes.rows[0].id });
+  } catch (err) {
+    console.error("[SERVICE-CRYPTO]", err);
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
 
 // ─── ROUTE: Liste des paliers de soutien — publique (pas de connexion requise)
 app.get("/api/support-tiers", async (req, res) => {
