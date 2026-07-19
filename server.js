@@ -316,9 +316,9 @@ app.post("/api/buy-item", requireAuth, async (req, res) => {
     // Enregistrement (plan_id = item_id tel quel : "strat_C1" ou "idea_3")
     const dbRes = await pool.query(
       `INSERT INTO payment_requests
-         (user_id, plan_id, plan_label, amount_usd, duration_minutes, payment_method, status)
-       VALUES ($1,$2,$3,$4,0,'mobile_money','pending') RETURNING id`,
-      [req.session.userId, item_id, item_name, price_usd]
+         (user_id, plan_id, plan_label, amount_usd, duration_minutes, payment_method, status, phone_number)
+       VALUES ($1,$2,$3,$4,0,'mobile_money','pending',$5) RETURNING id`,
+      [req.session.userId, item_id, item_name, price_usd, String(numeroSend).trim()]
     );
     const payReqId = dbRes.rows[0].id;
 
@@ -385,13 +385,14 @@ app.post("/api/create-payment", requireAuth, async (req, res) => {
     // Enregistrement en base (statut: pending)
     const dbRes = await pool.query(
       `INSERT INTO payment_requests
-         (user_id, plan_id, plan_label, amount_usd, duration_minutes, payment_method, status)
-       VALUES ($1,$2,$3,$4,$5,'mobile_money','pending') RETURNING id`,
+         (user_id, plan_id, plan_label, amount_usd, duration_minutes, payment_method, status, phone_number)
+       VALUES ($1,$2,$3,$4,$5,'mobile_money','pending',$6) RETURNING id`,
       [req.session.userId,
        plan ? plan.id : "custom",
        plan ? plan.label : "Personnalisé",
        plan ? plan.amount_usd : 0,
-       plan ? plan.duration_minutes : 0]
+       plan ? plan.duration_minutes : 0,
+       String(numeroSend).trim()]
     );
     const payReqId = dbRes.rows[0].id;
 
@@ -509,6 +510,54 @@ app.get("/api/payment-status/:token", async (req, res) => {
   }
 });
 
+// ─── ROUTE: Polling public — vérifie et active si payé ───────────────────
+// Utilisé par le frontend après envoi du USSD, sans redirection vers Money Fusion
+app.get("/api/poll-payment/:payReqId", async (req, res) => {
+  try {
+    const prRes = await pool.query(
+      "SELECT * FROM payment_requests WHERE id = $1",
+      [req.params.payReqId]
+    );
+    if (!prRes.rows.length) return res.status(404).json({ status: "not_found" });
+    const pr = prRes.rows[0];
+
+    // Déjà validé en base
+    if (pr.status === "validated") return res.json({ status: "paid" });
+
+    // Interroger Money Fusion si on a un token
+    if (pr.transaction_id) {
+      try {
+        const mfRes  = await fetch(`${CONFIG.STATUS_URL}/${pr.transaction_id}`, {
+          headers: { "Authorization": `Bearer ${CONFIG.API_KEY}` },
+        });
+        const mfData = await mfRes.json();
+        console.log("[POLL]", pr.transaction_id, JSON.stringify(mfData));
+
+        // La doc Money Fusion : data.statut === "paid"
+        const innerStatut = mfData?.data?.statut || mfData?.statut;
+        const isPaid = innerStatut === "paid" || innerStatut === "payé"
+                    || innerStatut === "completed" || innerStatut === true;
+
+        if (isPaid) {
+          await activateSubscription(pr);
+          return res.json({ status: "paid" });
+        }
+
+        const isFailed = innerStatut === "failure" || innerStatut === "no paid"
+                      || innerStatut === "failed"  || innerStatut === "cancelled";
+        if (isFailed) return res.json({ status: "failed" });
+      } catch (e) {
+        console.error("[POLL-MF]", e.message);
+      }
+    }
+
+    res.json({ status: "pending" });
+  } catch (err) {
+    console.error("[POLL]", err);
+    res.status(500).json({ status: "error" });
+  }
+});
+
 // ─── ROUTE: IP du serveur ─────────────────────────────────────────────────
 app.get("/my-ip", async (req, res) => {
   try {
@@ -606,18 +655,19 @@ app.post("/api/create-support-public", async (req, res) => {
   const price_usd = parseFloat((tier.price_xof / 650).toFixed(2));
 
   try {
+    const phoneNum = String(numeroSend).trim();
     const dbRes = await pool.query(
       `INSERT INTO payment_requests
-         (user_id, plan_id, plan_label, amount_usd, duration_minutes, payment_method, status)
-       VALUES (NULL,$1,$2,$3,0,'mobile_money','pending') RETURNING id`,
-      [tier.id, tier.label, price_usd]
+         (user_id, plan_id, plan_label, amount_usd, duration_minutes, payment_method, status, phone_number)
+       VALUES (NULL,$1,$2,$3,0,'mobile_money','pending',$4) RETURNING id`,
+      [tier.id, tier.label, price_usd, phoneNum]
     ).catch(() =>
       // Si user_id NOT NULL, on utilise -1 comme ID invité
       pool.query(
         `INSERT INTO payment_requests
-           (user_id, plan_id, plan_label, amount_usd, duration_minutes, payment_method, status)
-         VALUES (-1,$1,$2,$3,0,'mobile_money','pending') RETURNING id`,
-        [tier.id, tier.label, price_usd]
+           (user_id, plan_id, plan_label, amount_usd, duration_minutes, payment_method, status, phone_number)
+         VALUES (-1,$1,$2,$3,0,'mobile_money','pending',$4) RETURNING id`,
+        [tier.id, tier.label, price_usd, phoneNum]
       )
     );
     const payReqId = dbRes.rows[0].id;
@@ -679,9 +729,9 @@ app.post("/api/create-support", requireAuth, async (req, res) => {
 
     const dbRes = await pool.query(
       `INSERT INTO payment_requests
-         (user_id, plan_id, plan_label, amount_usd, duration_minutes, payment_method, status)
-       VALUES ($1,$2,$3,$4,0,'mobile_money','pending') RETURNING id`,
-      [req.session.userId, tier.id, tier.label, price_usd]
+         (user_id, plan_id, plan_label, amount_usd, duration_minutes, payment_method, status, phone_number)
+       VALUES ($1,$2,$3,$4,0,'mobile_money','pending',$5) RETURNING id`,
+      [req.session.userId, tier.id, tier.label, price_usd, String(numeroSend).trim()]
     );
     const payReqId = dbRes.rows[0].id;
 
@@ -743,7 +793,7 @@ app.get("/api/admin/payments", requireAdmin, async (req, res) => {
     const sql = `
       SELECT pr.id, pr.user_id, pr.plan_id, pr.plan_label, pr.amount_usd,
              pr.duration_minutes, pr.payment_method, pr.status, pr.transaction_id,
-             pr.admin_validated_at, pr.created_at,
+             pr.admin_validated_at, pr.created_at, pr.phone_number,
              u.username, u.first_name, u.last_name
       FROM payment_requests pr
       LEFT JOIN users u ON u.id = pr.user_id

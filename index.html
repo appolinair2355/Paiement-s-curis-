@@ -303,8 +303,8 @@
       <p style="color:rgba(255,255,255,.5);font-size:.82rem;margin:0 0 4px">Soutien au développeur</p>
       <div id="modalPrice" style="color:#10B981;font-weight:800;font-size:1.3rem;margin-bottom:18px"></div>
 
-      <!-- Nom -->
-      <div style="margin-bottom:14px">
+      <!-- Nom (caché si connecté) -->
+      <div id="donorNameBlock" style="margin-bottom:14px">
         <label class="form-label-sm">Votre nom (facultatif)</label>
         <div class="input-wrapper" style="margin-top:0">
           <input type="text" id="donorName" placeholder="Ex : Jean Dupont" style="padding-left:14px">
@@ -347,6 +347,21 @@
         <span id="btnPayTxt">💳 Payer maintenant</span>
         <span class="btn-loader hidden" id="payLoad"></span>
       </button>
+
+      <!-- ÉCRAN D'ATTENTE (affiché après envoi USSD) -->
+      <div id="waitScreen" class="hidden" style="text-align:center;padding:10px 0">
+        <div style="font-size:3rem;margin-bottom:12px">📱</div>
+        <p style="color:#10B981;font-weight:700;font-size:1rem;margin:0 0 6px">Demande envoyée !</p>
+        <p style="color:rgba(255,255,255,.65);font-size:.85rem;margin:0 0 16px;line-height:1.5">
+          Un message de confirmation va apparaître sur votre téléphone.<br>
+          <strong style="color:#F0C040">Confirmez le paiement sur votre téléphone.</strong>
+        </p>
+        <div class="btn-loader" style="display:inline-block;margin-bottom:14px"></div>
+        <p id="waitStatus" style="color:rgba(255,255,255,.4);font-size:.78rem;margin:0">Vérification en cours…</p>
+        <button onclick="cancelWait()" style="margin-top:14px;background:none;border:1px solid rgba(255,255,255,.2);color:rgba(255,255,255,.5);border-radius:8px;padding:7px 18px;cursor:pointer;font-size:.78rem">
+          Annuler
+        </button>
+      </div>
     </div>
   </div>
 
@@ -413,7 +428,15 @@
       cm:{name:'Cameroun',      flag:'🇨🇲',code:'+237',nets:[{k:'mtn',n:'MTN',c:'#FFCC00'},{k:'orange',n:'Orange',c:'#FF6600'}]},
       fr:{name:'France',        flag:'🇫🇷',code:'+33', nets:[{k:'orange',n:'Orange',c:'#FF6600'}]},
     };
-    let selTier=null, selCountry=null, selNet=null;
+    let selTier=null, selCountry=null, selNet=null, loggedUser=null;
+
+    // Vérifier si l'utilisateur est connecté au chargement
+    (async function checkLogin(){
+      try {
+        const r = await fetch('/api/me');
+        if(r.ok) loggedUser = await r.json();
+      } catch(e) {}
+    })();
 
     function tierIcon(p){ return p>=100000?'👑':p>=50000?'🏆':p>=25000?'💎':p>=10000?'⭐':p>=5000?'🥇':p>=2000?'🥈':p>=1000?'🥉':'💖'; }
     function tierBadge(p){
@@ -461,7 +484,14 @@
       document.getElementById('modalIcon').textContent=tierIcon(tier.price_xof);
       document.getElementById('modalTitle').textContent=tier.label;
       document.getElementById('modalPrice').textContent=Number(tier.price_xof).toLocaleString('fr-FR')+' FCFA';
-      document.getElementById('donorName').value='';
+      // Si connecté : nom auto depuis la session, cacher le champ nom
+      const nameBlock = document.getElementById('donorNameBlock');
+      if(loggedUser) {
+        nameBlock.style.display = 'none';
+      } else {
+        nameBlock.style.display = '';
+        document.getElementById('donorName').value = '';
+      }
       const sel=document.getElementById('countrySelect');
       sel.innerHTML='<option value="" disabled selected>Sélectionner un pays</option>';
       Object.entries(COUNTRIES).forEach(([k,v])=>{
@@ -505,33 +535,71 @@
       document.getElementById('btnPay').classList.toggle('hidden', !(selNet&&selCountry&&phone.length>=8));
     }
 
+    let pollInterval = null;
+
+    function showWaitScreen(payReqId, type) {
+      document.getElementById('btnPay').classList.add('hidden');
+      document.getElementById('payErr').classList.add('hidden');
+      document.getElementById('netGrp').classList.add('hidden');
+      document.getElementById('phoneGrp').classList.add('hidden');
+      document.querySelectorAll('#payModal .modal-box > div:not(#waitScreen)').forEach(el => {
+        if(!el.id || !['modalIcon','modalTitle'].includes(el.id)) el.style.display='none';
+      });
+      document.getElementById('waitScreen').classList.remove('hidden');
+      let attempts = 0;
+      const maxAttempts = 60;
+      pollInterval = setInterval(async () => {
+        attempts++;
+        const st = document.getElementById('waitStatus');
+        if(st) st.textContent = `Vérification en cours… (${attempts})`;
+        try {
+          const r = await fetch(`/api/poll-payment/${payReqId}`);
+          const d = await r.json();
+          if (d.status === 'paid') {
+            clearInterval(pollInterval);
+            window.location.href = `/success.html?req=${payReqId}&type=${type}`;
+          } else if (d.status === 'failed') {
+            clearInterval(pollInterval);
+            if(st) st.textContent = '❌ Paiement échoué ou annulé. Réessayez.';
+          } else if (attempts >= maxAttempts) {
+            clearInterval(pollInterval);
+            if(st) st.textContent = '⏱ Délai dépassé. Vérifiez votre téléphone ou réessayez.';
+          }
+        } catch(e) { /* continue */ }
+      }, 5000);
+    }
+
+    function cancelWait() {
+      clearInterval(pollInterval);
+      closeModal();
+    }
+
     async function doPay(){
       if(!selTier) return;
       const btn=document.getElementById('btnPay'), txt=document.getElementById('btnPayTxt');
       const ld=document.getElementById('payLoad'), err=document.getElementById('payErr');
       const etx=document.getElementById('payErrTxt');
-      btn.disabled=true; txt.textContent='Ouverture…'; ld.classList.remove('hidden'); err.classList.add('hidden');
+      btn.disabled=true; txt.textContent='Envoi en cours…'; ld.classList.remove('hidden'); err.classList.add('hidden');
       const rawPhone = document.getElementById('phoneInput').value.trim().replace(/\s/g,'');
-      const nom=(document.getElementById('donorName').value||'').trim()||'Donateur';
-      // Format Money Fusion : code pays sans "+" + numéro local complet (avec le 0 initial)
-      // En Bénin les numéros commencent par 01 : c'est partie du numéro, pas un préfixe trunk
-      const codeDigits = selCountry.code.replace('+','');
-      const numeroSend = codeDigits + rawPhone;
+      // Si connecté : utiliser le nom du compte, sinon le champ saisi
+      const nom = loggedUser
+        ? ([loggedUser.first_name, loggedUser.last_name].filter(Boolean).join(' ') || loggedUser.username || 'Donateur')
+        : ((document.getElementById('donorName').value||'').trim()||'Donateur');
+      const numeroSend = rawPhone;
       try{
         const r=await fetch('/api/create-support-public',{
           method:'POST', headers:{'Content-Type':'application/json'},
           body:JSON.stringify({ tier_id:selTier.id, numeroSend, nomclient:nom })
         });
         const d=await r.json();
-        if(d.url){ window.location.href=d.url; return; }
-        if(d.statut===true||d.success===true){
-          closeModal();
-          window.location.href=`/success.html?req=${d.payment_req_id}&type=support`;
-        } else {
-          etx.textContent=d.message||d.error||'Erreur lors du paiement';
+        if(!d.payment_req_id){
+          etx.textContent=d.error||d.message||'Erreur lors du paiement';
           err.classList.remove('hidden');
           btn.disabled=false; txt.textContent='💳 Payer maintenant'; ld.classList.add('hidden');
+          return;
         }
+        // Ne pas rediriger vers Money Fusion — le USSD est envoyé sur le téléphone
+        showWaitScreen(d.payment_req_id, 'support');
       }catch{
         etx.textContent='Erreur réseau. Réessayez.';
         err.classList.remove('hidden');

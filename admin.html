@@ -94,8 +94,9 @@
             <thead>
               <tr>
                 <th>#ID</th>
-                <th>Date</th>
+                <th>Date &amp; Heure</th>
                 <th>Identifiant / Nom</th>
+                <th>Téléphone</th>
                 <th>Type</th>
                 <th>Produit / Palier</th>
                 <th>Montant</th>
@@ -105,7 +106,7 @@
               </tr>
             </thead>
             <tbody id="payBody">
-              <tr><td colspan="9" style="text-align:center;padding:24px;color:rgba(255,255,255,0.5)">Chargement…</td></tr>
+              <tr><td colspan="10" style="text-align:center;padding:24px;color:rgba(255,255,255,0.5)">Chargement…</td></tr>
             </tbody>
           </table>
         </div>
@@ -169,21 +170,21 @@
       if(t) params.set('type',t);
       if(st) params.set('status',st);
       if(q) params.set('q',q);
-      document.getElementById('payBody').innerHTML='<tr><td colspan="9" style="text-align:center;padding:24px;color:rgba(255,255,255,0.5)">Chargement…</td></tr>';
+      document.getElementById('payBody').innerHTML='<tr><td colspan="10" style="text-align:center;padding:24px;color:rgba(255,255,255,0.5)">Chargement…</td></tr>';
       try{
         const r=await fetch('/api/admin/payments?'+params.toString());
-        if(!r.ok){ document.getElementById('payBody').innerHTML='<tr><td colspan="9" style="text-align:center;padding:24px;color:#F87171">Erreur de chargement</td></tr>'; return; }
+        if(!r.ok){ document.getElementById('payBody').innerHTML='<tr><td colspan="10" style="text-align:center;padding:24px;color:#F87171">Erreur de chargement</td></tr>'; return; }
         const d=await r.json();
         currentRows=d.payments||[];
         renderRows(currentRows);
       }catch(e){
-        document.getElementById('payBody').innerHTML='<tr><td colspan="9" style="text-align:center;padding:24px;color:#F87171">Erreur réseau</td></tr>';
+        document.getElementById('payBody').innerHTML='<tr><td colspan="10" style="text-align:center;padding:24px;color:#F87171">Erreur réseau</td></tr>';
       }
     }
 
     function renderRows(rows){
       const body=document.getElementById('payBody');
-      if(!rows.length){ body.innerHTML='<tr><td colspan="9" style="text-align:center;padding:24px;color:rgba(255,255,255,0.4)">Aucun paiement trouvé</td></tr>'; return; }
+      if(!rows.length){ body.innerHTML='<tr><td colspan="10" style="text-align:center;padding:24px;color:rgba(255,255,255,0.4)">Aucun paiement trouvé</td></tr>'; return; }
       body.innerHTML=rows.map(r=>{
         const dt=r.created_at?new Date(r.created_at).toLocaleString('fr-FR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}):'—';
         const status=r.status||'—';
@@ -195,9 +196,10 @@
           <td>#${r.id}</td>
           <td style="white-space:nowrap">${dt}</td>
           <td class="user-cell"><strong>${escapeHtml(r.username||'—')}</strong>${fullName?`<small>${escapeHtml(fullName)}</small>`:''}<small>user_id: ${r.user_id||'—'}</small></td>
+          <td style="white-space:nowrap;font-family:monospace;font-size:.82rem">${escapeHtml(r.phone_number||'—')}</td>
           <td><span class="badge ${tCls}">${tLbl}</span></td>
           <td>${escapeHtml(r.plan_label||'—')}<br><small style="color:rgba(255,255,255,0.4);font-size:.7rem">${escapeHtml(r.plan_id||'')}</small></td>
-          <td><strong>${(r.amount_xof||0).toLocaleString('fr-FR')} FCFA</strong><br><small style="color:rgba(255,255,255,0.4);font-size:.7rem">$${(Number(r.amount_usd)||0).toFixed(2)}</small></td>
+          <td><strong>${(r.amount_xof||0).toLocaleString('fr-FR')} FCFA</strong><br><small style="color:rgba(255,255,255,0.4);font-size:.7rem">${(Number(r.amount_usd)||0).toFixed(2)}</small></td>
           <td>${r.payment_method==='crypto'?'₿ Crypto':'📱 Mobile'}</td>
           <td><span class="badge ${sCls}">${status}</span></td>
           <td><span class="txid">${escapeHtml(r.transaction_id||'—')}</span></td>
@@ -209,11 +211,14 @@
 
     function exportCSV(){
       if(!currentRows.length){ alert('Aucune donnée à exporter'); return; }
-      const headers=['id','date','username','nom_complet','user_id','type','plan_id','plan_label','amount_xof','amount_usd','payment_method','status','transaction_id','admin_validated_at'];
+      const headers=['id','date','heure','username','nom_complet','user_id','telephone','type','plan_id','plan_label','amount_xof','amount_usd','payment_method','status','reference_transaction','date_validation'];
       const rows=[headers.join(',')];
       currentRows.forEach(r=>{
         const full=[r.first_name,r.last_name].filter(Boolean).join(' ');
-        const line=[r.id,r.created_at||'',r.username||'',full,r.user_id||'',r.type,r.plan_id||'',r.plan_label||'',r.amount_xof||0,r.amount_usd||0,r.payment_method||'',r.status||'',r.transaction_id||'',r.admin_validated_at||''];
+        const d=r.created_at?new Date(r.created_at):null;
+        const dateStr=d?d.toLocaleDateString('fr-FR'):'';
+        const heureStr=d?d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit',second:'2-digit'}):'';
+        const line=[r.id,dateStr,heureStr,r.username||'',full,r.user_id||'',r.phone_number||'',r.type,r.plan_id||'',r.plan_label||'',r.amount_xof||0,r.amount_usd||0,r.payment_method||'',r.status||'',r.transaction_id||'',r.admin_validated_at||''];
         rows.push(line.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(','));
       });
       const blob=new Blob([rows.join('\n')],{type:'text/csv;charset=utf-8'});

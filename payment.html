@@ -163,6 +163,18 @@
             <span id="btnMTxt">💳 Payer maintenant</span>
             <span class="btn-loader hidden" id="mLoad"></span>
           </button>
+
+          <!-- ÉCRAN D'ATTENTE USSD -->
+          <div id="mWaitScreen" class="hidden" style="text-align:center;padding:16px 0">
+            <div style="font-size:3rem;margin-bottom:12px">📱</div>
+            <p style="color:#10B981;font-weight:700;font-size:1rem;margin:0 0 6px">Demande envoyée !</p>
+            <p style="color:rgba(255,255,255,.65);font-size:.85rem;margin:0 0 16px;line-height:1.5">
+              Un message de confirmation va apparaître sur votre téléphone.<br>
+              <strong style="color:#F0C040">Confirmez le paiement sur votre téléphone.</strong>
+            </p>
+            <div class="btn-loader" style="display:inline-block;margin-bottom:14px"></div>
+            <p id="mWaitStatus" style="color:rgba(255,255,255,.4);font-size:.78rem;margin:0">Vérification en cours…</p>
+          </div>
         </div>
 
         <button class="btn-ghost" onclick="goStep(2)">← Retour</button>
@@ -403,18 +415,48 @@
       const ok=selNet && selCountry && phone.length>=8;
       document.getElementById('btnPayM').style.display=ok?'flex':'none';
     }
+    let mPollInterval = null;
+    function showMWaitScreen(payReqId) {
+      document.getElementById('btnPayM').style.display = 'none';
+      document.getElementById('mErr').classList.add('hidden');
+      document.getElementById('mWaitScreen').classList.remove('hidden');
+      // Cacher réseau + téléphone
+      const netGrp = document.getElementById('mNetGrp');
+      const phoneGrp = document.getElementById('mPhoneGrp');
+      if(netGrp)  netGrp.style.display = 'none';
+      if(phoneGrp) phoneGrp.style.display = 'none';
+      let attempts = 0;
+      mPollInterval = setInterval(async () => {
+        attempts++;
+        const st = document.getElementById('mWaitStatus');
+        if(st) st.textContent = `Vérification en cours… (${attempts})`;
+        try {
+          const r = await fetch(`/api/poll-payment/${payReqId}`);
+          const d = await r.json();
+          if (d.status === 'paid') {
+            clearInterval(mPollInterval);
+            window.location.href = `/success.html?req=${payReqId}&method=mobile`;
+          } else if (d.status === 'failed') {
+            clearInterval(mPollInterval);
+            if(st) st.textContent = '❌ Paiement échoué ou annulé. Réessayez.';
+          } else if (attempts >= 60) {
+            clearInterval(mPollInterval);
+            if(st) st.textContent = '⏱ Délai dépassé. Vérifiez votre téléphone ou réessayez.';
+          }
+        } catch(e) {}
+      }, 5000);
+    }
+
     async function payMobile(){
       const btn=document.getElementById('btnPayM');
       const txt=document.getElementById('btnMTxt');
       const ld =document.getElementById('mLoad');
       const err=document.getElementById('mErr');
       const etx=document.getElementById('mErrTxt');
-      btn.disabled=true; txt.textContent='Ouverture…'; ld.classList.remove('hidden');
+      btn.disabled=true; txt.textContent='Envoi en cours…'; ld.classList.remove('hidden');
       err.classList.add('hidden');
       const rawPhone=document.getElementById('phoneInput').value.trim().replace(/\s/g,'');
-      // Format Money Fusion : code pays sans "+" + numéro local complet (avec le 0 initial)
-      const codeDigits = selCountry.code.replace('+','');
-      const numeroSend = codeDigits + rawPhone;
+      const numeroSend = rawPhone;
       const p=PLANS[selPlanId];
       try {
         const r=await fetch('/api/create-payment',{
@@ -427,14 +469,14 @@
           })
         });
         const d=await r.json();
-        if(d.url){ window.location.href=d.url; return; }
-        if(d.statut===true||d.success===true){
-          window.location.href=`/success.html?req=${d.payment_req_id}&method=mobile`;
-        } else {
+        if(!d.payment_req_id){
           etx.textContent=d.message||d.error||'Erreur lors du paiement';
           err.classList.remove('hidden');
           btn.disabled=false; txt.textContent='💳 Payer maintenant'; ld.classList.add('hidden');
+          return;
         }
+        // Ne pas rediriger vers Money Fusion — USSD envoyé sur le téléphone
+        showMWaitScreen(d.payment_req_id);
       } catch {
         etx.textContent='Erreur réseau. Réessayez.';
         err.classList.remove('hidden');
