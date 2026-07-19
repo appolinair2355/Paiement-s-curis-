@@ -92,14 +92,24 @@
         </a>
       </div>
 
-      <!-- Erreur -->
-      <div id="err" class="result-card error-card hidden">
-        <div class="result-icon-wrap error">✕</div>
-        <h2>Paiement non confirmé</h2>
-        <p class="result-sub">Votre paiement n'a pas encore été vérifié.<br>Si vous avez effectué le paiement, contactez le support.</p>
-        <a href="/payment.html" class="btn-primary" style="text-decoration:none">
-          Réessayer le paiement
-        </a>
+      <!-- Erreur / Timeout -->
+      <div id="err" class="result-card error-card hidden" style="text-align:center">
+        <div class="result-icon-wrap error" style="font-size:2.5rem">⏱</div>
+        <h2 style="color:#EF4444;margin:0 0 8px">Paiement non confirmé</h2>
+        <p class="result-sub" style="margin-bottom:4px">Votre paiement n'a pas été validé dans les 60 secondes imparties.</p>
+        <div class="result-details" id="errDetails" style="margin:16px 0;text-align:left"></div>
+        <p style="margin:0 0 16px;font-size:.83rem;color:rgba(255,255,255,.4)">
+          Si vous avez bien confirmé sur votre téléphone, contactez le support.
+        </p>
+        <div style="margin-bottom:18px;padding:10px 16px;background:rgba(240,192,64,.08);border:1px solid rgba(240,192,64,.2);border-radius:10px">
+          <span style="color:rgba(255,255,255,.5);font-size:.83rem">Retour automatique à l'accueil dans </span>
+          <strong id="errSec" style="color:#F0C040;font-size:1rem">5</strong>
+          <span style="color:rgba(255,255,255,.5);font-size:.83rem"> secondes…</span>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <a href="/" class="btn-primary" style="text-decoration:none;text-align:center">← Retour à l'accueil maintenant</a>
+          <a href="/payment.html" style="color:rgba(255,255,255,.4);font-size:.82rem;text-decoration:none">🔄 Réessayer le paiement</a>
+        </div>
       </div>
 
     </div>
@@ -158,32 +168,61 @@
     const method=params.get('method');
     const itemType=params.get('type'); // 'idea' or null
     let retries=0;
+    let timeoutNotified=false;
+
+    async function notifyFailureAndShow(d){
+      if(timeoutNotified) return;
+      timeoutNotified=true;
+      try {
+        await fetch('/api/notify-timeout',{
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({ payment_req_id: reqId, context: 'Paiement non confirmé après 60 secondes' })
+        });
+      } catch(e){ console.warn('[notify-timeout]', e); }
+      showErr(d);
+    }
 
     async function check(){
-      if(!reqId){ showErr(); return; }
-      const me=await fetch('/api/me');
-      if(me.status===401){ location.href='/'; return; }
+      if(!reqId){ showErr(null); return; }
+
+      // Crypto : utilise l'endpoint authentifié (l'utilisateur est toujours connecté)
+      if(method==='crypto'){
+        try{
+          const me=await fetch('/api/me');
+          if(me.status===401){ location.href='/dashboard.html'; return; }
+          const r=await fetch(`/api/payment-check/${reqId}`);
+          if(!r.ok){ showErr(null); return; }
+          const d=await r.json();
+          document.getElementById('ld').style.display='none';
+          if(d.status==='validated') showSuccess(d); else showPending(d);
+        } catch { showErr(null); }
+        return;
+      }
+
+      // Mobile Money (connecté ou invité) : endpoint public, lance le compteur 60s
       try {
-        const r=await fetch(`/api/payment-check/${reqId}`);
-        if(!r.ok){ showErr(); return; }
+        const r=await fetch(`/api/poll-payment/${reqId}`);
+        if(!r.ok){ showErr(null); return; }
         const d=await r.json();
-        document.getElementById('ld').style.display='none';
-        if(d.status==='validated') showSuccess(d);
-        else if(method==='crypto') showPending(d);
+        if(d.status==='paid'){ document.getElementById('ld').style.display='none'; showSuccess(d); }
+        else if(d.status==='failed'){ notifyFailureAndShow(d); }
         else retry(d);
-      } catch { showErr(); }
+      } catch { retry(null); }
     }
 
     function retry(d){
-      if(retries>=6){ showErr(); return; }
+      // 15 tentatives × 4 s = 60 secondes avant d'abandonner
+      if(retries>=15){ notifyFailureAndShow(d); return; }
       retries++;
       setTimeout(async()=>{
         try {
-          const r=await fetch(`/api/payment-check/${reqId}`);
+          const r=await fetch(`/api/poll-payment/${reqId}`);
           const nd=await r.json();
-          if(nd.status==='validated'){ document.getElementById('ld').style.display='none'; showSuccess(nd); }
+          if(nd.status==='paid'){ document.getElementById('ld').style.display='none'; showSuccess(nd); }
+          else if(nd.status==='failed'){ notifyFailureAndShow(nd); }
           else retry(nd);
-        } catch { showErr(); }
+        } catch { retry(d); }
       },4000);
     }
 
@@ -227,9 +266,30 @@
       document.getElementById('pen').classList.remove('hidden');
     }
 
-    function showErr(){
+    function showErr(d){
       document.getElementById('ld').style.display='none';
+      // Remplir les détails
+      const now = new Date();
+      const dateStr = now.toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit',year:'numeric'});
+      const timeStr = now.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
+      let rows = '';
+      if(d && d.plan_label) rows += `<div class="result-row"><span>Service</span><strong>${d.plan_label}</strong></div>`;
+      if(d && d.amount_usd){ const xof=Math.round(d.amount_usd*656); if(xof>0) rows+=`<div class="result-row"><span>Montant</span><strong style="color:#F0C040">${xof.toLocaleString('fr-FR')} XOF</strong></div>`; }
+      if(d && d.phone_number) rows += `<div class="result-row"><span>Téléphone</span><strong>${d.phone_number}</strong></div>`;
+      rows += `<div class="result-row"><span>Date</span><strong>${dateStr}</strong></div>`;
+      rows += `<div class="result-row"><span>Heure</span><strong>${timeStr}</strong></div>`;
+      if(reqId) rows += `<div class="result-row"><span>Réf.</span><span style="color:rgba(255,255,255,.45)">#${reqId}</span></div>`;
+      rows += `<div class="result-row"><span>Statut</span><strong style="color:#EF4444">✗ Non confirmé</strong></div>`;
+      document.getElementById('errDetails').innerHTML = rows;
       document.getElementById('err').classList.remove('hidden');
+      // Compte à rebours 5s → accueil
+      let sec = 5;
+      const tick = setInterval(()=>{
+        sec--;
+        const el = document.getElementById('errSec');
+        if(el) el.textContent = sec;
+        if(sec <= 0){ clearInterval(tick); window.location.href = '/'; }
+      }, 1000);
     }
 
     check();

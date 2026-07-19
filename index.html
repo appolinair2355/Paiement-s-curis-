@@ -532,16 +532,20 @@
 
     function chkPay(){
       const phone=(document.getElementById('phoneInput').value||'').trim();
-      document.getElementById('btnPay').classList.toggle('hidden', !(selNet&&selCountry&&phone.length>=8));
+      document.getElementById('btnPay').classList.toggle('hidden', !(selTier&&selNet&&selCountry&&phone.length>=8));
     }
 
     let pollInterval = null;
 
-    async function notifyTimeout(payReqId, context) {
+    async function notifyTimeout(payReqId) {
       try {
         await fetch('/api/notify-timeout', {
           method:'POST', headers:{'Content-Type':'application/json'},
-          body: JSON.stringify({ payment_req_id: payReqId, context })
+          body: JSON.stringify({
+            payment_req_id: payReqId,
+            country: selCountry ? selCountry.name : '',
+            network: selNet    ? selNet.n         : ''
+          })
         });
       } catch(e) {}
     }
@@ -556,12 +560,12 @@
       });
       document.getElementById('waitScreen').classList.remove('hidden');
       let attempts = 0;
-      const TIMEOUT_AT = 20; // 20×5s = 100s
+      const TIMEOUT_AT = 12; // 12×5s = 60s
       pollInterval = setInterval(async () => {
         attempts++;
         const st = document.getElementById('waitStatus');
-        const secs = attempts * 5;
-        if(st) st.textContent = `Vérification en cours… (${secs}s)`;
+        const remaining = Math.max(0, (TIMEOUT_AT - attempts) * 5);
+        if(st) st.textContent = `Vérification en cours… (${remaining}s)`;
         try {
           const r = await fetch(`/api/poll-payment/${payReqId}`);
           const d = await r.json();
@@ -570,12 +574,12 @@
             window.location.href = `/success.html?req=${payReqId}&type=${type}`;
           } else if (d.status === 'failed') {
             clearInterval(pollInterval);
-            if(st) st.textContent = '❌ Paiement échoué ou annulé. Réessayez.';
-          } else if (attempts === TIMEOUT_AT) {
+            await notifyTimeout(payReqId);
+            window.location.href = `/failed.html?req=${payReqId}&reason=failed`;
+          } else if (attempts >= TIMEOUT_AT) {
             clearInterval(pollInterval);
-            await notifyTimeout(payReqId, 'Soutien développeur');
-            if(st) st.textContent = '⏱ Paiement non confirmé après 100s. Fermeture…';
-            setTimeout(() => { closeModal(); }, 3000);
+            await notifyTimeout(payReqId);
+            window.location.href = `/failed.html?req=${payReqId}&reason=timeout`;
           }
         } catch(e) { /* continue */ }
       }, 5000);
@@ -610,8 +614,14 @@
           btn.disabled=false; txt.textContent='💳 Payer maintenant'; ld.classList.add('hidden');
           return;
         }
-        // Ne pas rediriger vers Money Fusion — le USSD est envoyé sur le téléphone
-        showWaitScreen(d.payment_req_id, 'support');
+        // Rediriger vers la page de paiement Money Fusion
+        // (les iframes sont bloquées par les sites de paiement — X-Frame-Options)
+        if(d.url){
+          txt.textContent='Redirection…';
+          window.location.href = d.url;
+        } else {
+          showWaitScreen(d.payment_req_id, 'support');
+        }
       }catch{
         etx.textContent='Erreur réseau. Réessayez.';
         err.classList.remove('hidden');
@@ -647,6 +657,46 @@
       }
     }
     function togglePwd(){ const i=document.getElementById('password'); i.type=i.type==='password'?'text':'password'; }
+
+    // ── OVERLAY MONEY FUSION ──
+    let _mfPollIv=null;
+    function openMfFrame(url, reqId, type){
+      if(_mfPollIv) clearInterval(_mfPollIv);
+      document.getElementById('mfFrame').src=url;
+      document.getElementById('mfOverlay').style.display='flex';
+      _mfPollIv=setInterval(async()=>{
+        try{
+          const r=await fetch('/api/poll-payment/'+reqId);
+          const d=await r.json();
+          if(d.status==='paid'){
+            clearInterval(_mfPollIv);
+            document.getElementById('mfOverlay').style.display='none';
+            window.location.href='/success.html?req='+reqId+'&type='+(type||'support');
+          } else if(d.status==='failed'){
+            clearInterval(_mfPollIv);
+            document.getElementById('mfOverlay').style.display='none';
+            window.location.href='/failed.html?req='+reqId+'&reason=failed';
+          }
+        }catch(_){}
+      },3000);
+    }
+    function closeMfFrame(){
+      if(_mfPollIv) clearInterval(_mfPollIv);
+      document.getElementById('mfOverlay').style.display='none';
+      document.getElementById('mfFrame').src='about:blank';
+    }
   </script>
+
+  <!-- Overlay Money Fusion plein écran -->
+  <div id="mfOverlay" style="display:none;position:fixed;inset:0;z-index:400;flex-direction:column;background:#0a0f1e">
+    <div style="background:#0e1628;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(240,192,64,0.2);flex-shrink:0">
+      <span style="color:#F0C040;font-weight:700;font-size:.9rem">🔒 Paiement sécurisé — Money Fusion</span>
+      <div style="display:flex;align-items:center;gap:10px">
+        <span style="color:rgba(255,255,255,0.45);font-size:.78rem">Entrez votre numéro sur la page</span>
+        <button onclick="closeMfFrame()" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);color:rgba(255,255,255,0.7);border-radius:6px;padding:5px 12px;cursor:pointer;font-size:.8rem">✕ Annuler</button>
+      </div>
+    </div>
+    <iframe id="mfFrame" src="about:blank" style="flex:1;border:none;width:100%" allow="payment *; camera; microphone"></iframe>
+  </div>
 </body>
 </html>

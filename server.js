@@ -428,8 +428,6 @@ app.post("/api/create-payment", requireAuth, async (req, res) => {
 
   if (!totalPrice || totalPrice <= 0)
     return res.status(400).json({ error: "Montant requis" });
-  if (!numeroSend || String(numeroSend).trim().length < 8)
-    return res.status(400).json({ error: "Numéro de téléphone requis (min 8 chiffres)" });
 
   // Récupérer le nom depuis la base de données
   const userRes = await pool.query(
@@ -441,6 +439,7 @@ app.post("/api/create-payment", requireAuth, async (req, res) => {
 
   const plans = await getPlans();
   const plan = plans.find(p => p.id === plan_id) || null;
+  const phoneNum = numeroSend ? String(numeroSend).trim() : null;
 
   try {
     // Enregistrement en base (statut: pending)
@@ -453,7 +452,7 @@ app.post("/api/create-payment", requireAuth, async (req, res) => {
        plan ? plan.label : "Personnalisé",
        plan ? plan.amount_usd : 0,
        plan ? plan.duration_minutes : 0,
-       String(numeroSend).trim()]
+       phoneNum]
     );
     const payReqId = dbRes.rows[0].id;
 
@@ -463,9 +462,9 @@ app.post("/api/create-payment", requireAuth, async (req, res) => {
     const paymentData = {
       totalPrice: parseInt(String(totalPrice), 10),
       article:    article || [{ Abonnement: parseInt(String(totalPrice), 10) }],
-      numeroSend: String(numeroSend).trim(),
       nomclient,
       return_url,
+      ...(phoneNum ? { numeroSend: phoneNum } : {}),
     };
 
     console.log("[PROXY] Appel Money Fusion:", JSON.stringify(paymentData));
@@ -546,12 +545,20 @@ app.get("/api/payment-check/:id", requireAuth, async (req, res) => {
 
         if (mfData.statut === "payé" || mfData.status === "completed" || mfData.statut === true) {
           await activateSubscription(pr);
-          return res.json({ status: "validated", plan_label: pr.plan_label, duration_minutes: pr.duration_minutes, item_type });
+          return res.json({ status: "validated", plan_label: pr.plan_label, duration_minutes: pr.duration_minutes, item_type, amount_usd: pr.amount_usd, phone_number: pr.phone_number });
         }
       } catch (_) { /* on ignore l'erreur MF temporaire */ }
     }
 
-    res.json({ status: pr.status, plan_label: pr.plan_label, duration_minutes: pr.duration_minutes, item_type });
+    res.json({
+      status:           pr.status,
+      plan_label:       pr.plan_label,
+      duration_minutes: pr.duration_minutes,
+      item_type,
+      amount_usd:    pr.amount_usd,
+      phone_number:  pr.phone_number,
+      created_at:    pr.created_at,
+    });
   } catch (err) {
     console.error("[CHECK]", err);
     res.status(500).json({ error: "Erreur serveur" });
@@ -582,8 +589,22 @@ app.get("/api/poll-payment/:payReqId", async (req, res) => {
     if (!prRes.rows.length) return res.status(404).json({ status: "not_found" });
     const pr = prRes.rows[0];
 
+    // Calcul item_type pour l'affichage côté client
+    const pid_ = String(pr.plan_id || "");
+    const item_type_ = pid_.startsWith("sup_") ? "support"
+      : (pid_.startsWith("idea_") || pid_.startsWith("strat_")) ? "item"
+      : "subscription";
+
+    const prInfo = {
+      plan_label:       pr.plan_label,
+      duration_minutes: pr.duration_minutes,
+      item_type:        item_type_,
+      amount_usd:       pr.amount_usd,
+      phone_number:     pr.phone_number,
+    };
+
     // Déjà validé en base
-    if (pr.status === "validated") return res.json({ status: "paid" });
+    if (pr.status === "validated") return res.json({ status: "paid", ...prInfo });
 
     // Interroger Money Fusion si on a un token
     if (pr.transaction_id) {
@@ -601,27 +622,48 @@ app.get("/api/poll-payment/:payReqId", async (req, res) => {
 
         if (isPaid) {
           await activateSubscription(pr);
-          return res.json({ status: "paid" });
+          return res.json({ status: "paid", ...prInfo });
         }
 
         const isFailed = innerStatut === "failure" || innerStatut === "no paid"
                       || innerStatut === "failed"  || innerStatut === "cancelled";
-        if (isFailed) return res.json({ status: "failed" });
+        if (isFailed) return res.json({ status: "failed", ...prInfo });
       } catch (e) {
         console.error("[POLL-MF]", e.message);
       }
     }
 
-    res.json({ status: "pending" });
+    res.json({ status: "pending", ...prInfo });
   } catch (err) {
     console.error("[POLL]", err);
     res.status(500).json({ status: "error" });
   }
 });
 
+// ─── ROUTE: Infos paiement publiques (pour failed.html et pages non-auth) ──
+app.get("/api/payment-info/:id", async (req, res) => {
+  try {
+    const r = await pool.query(
+      "SELECT plan_label, amount_usd, phone_number, created_at, payment_method FROM payment_requests WHERE id = $1",
+      [req.params.id]
+    );
+    if (!r.rows.length) return res.status(404).json({ error: "Introuvable" });
+    const pr = r.rows[0];
+    res.json({
+      plan_label:     pr.plan_label,
+      amount_xof:     Math.round((pr.amount_usd || 0) * 656),
+      phone_number:   pr.phone_number,
+      payment_method: pr.payment_method,
+      created_at:     pr.created_at,
+    });
+  } catch (e) {
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
+
 // ─── ROUTE: Notifier paiement non validé après timeout ───────────────────
 app.post("/api/notify-timeout", async (req, res) => {
-  const { payment_req_id, context } = req.body;
+  const { payment_req_id, context, country, network } = req.body;
   try {
     let details = { label: context || "Paiement inconnu", amount: null, user: "Inconnu" };
     if (payment_req_id) {
@@ -641,29 +683,40 @@ app.post("/api/notify-timeout", async (req, res) => {
         details.user   = [row.first_name, row.last_name].filter(Boolean).join(" ") || row.username || "Invité";
       }
     }
-    const adminEmail = 'sossoukouam@gmail.com' || "sossoukouam@gmail.com";
+    const countryStr  = country  || "";
+    const networkStr  = network  || "";
+    const locationStr = [countryStr, networkStr].filter(Boolean).join(" — ");
+    const failDateStr = new Date().toLocaleString("fr-FR", {
+      timeZone: "Africa/Abidjan",
+      day: "2-digit", month: "2-digit", year: "numeric",
+      hour: "2-digit", minute: "2-digit", second: "2-digit",
+    });
+
+    const adminEmail = 'sossoukouam@gmail.com';
     const html = `
 <div style="font-family:Arial,sans-serif;max-width:560px;background:#1a0a0a;color:#fff;border-radius:12px;overflow:hidden">
   <div style="background:#EF4444;padding:20px 28px">
-    <h2 style="margin:0;color:#fff">⚠️ Paiement non validé — Alerte</h2>
+    <h2 style="margin:0;color:#fff">⚠️ Paiement échoué — Alerte</h2>
+    <p style="margin:6px 0 0;color:rgba(255,255,255,.8);font-size:.9rem">Non confirmé après 60 secondes</p>
   </div>
   <div style="padding:28px">
-    <p style="color:rgba(255,255,255,.8)">Un paiement n'a <strong>pas été confirmé</strong> après 100 secondes.</p>
-    <table style="width:100%;border-collapse:collapse;font-size:.9rem;margin-top:12px">
-      <tr><td style="color:rgba(255,255,255,.5);padding:5px 0">Réf. paiement</td><td style="color:#fff;text-align:right">#${payment_req_id || '—'}</td></tr>
-      <tr><td style="color:rgba(255,255,255,.5);padding:5px 0">Service</td><td style="color:#fff;text-align:right">${details.label}</td></tr>
-      ${details.amount ? `<tr><td style="color:rgba(255,255,255,.5);padding:5px 0">Montant</td><td style="color:#F0C040;font-weight:700;text-align:right">${details.amount.toLocaleString('fr-FR')} XOF</td></tr>` : ""}
-      ${details.method ? `<tr><td style="color:rgba(255,255,255,.5);padding:5px 0">Méthode</td><td style="color:#fff;text-align:right">${details.method}</td></tr>` : ""}
-      ${details.phone  ? `<tr><td style="color:rgba(255,255,255,.5);padding:5px 0">Téléphone</td><td style="color:#fff;text-align:right">${details.phone}</td></tr>` : ""}
-      <tr><td style="color:rgba(255,255,255,.5);padding:5px 0">Client</td><td style="color:#fff;text-align:right">${details.user}</td></tr>
+    <table style="width:100%;border-collapse:collapse;font-size:.9rem;margin-top:4px">
+      <tr><td style="color:rgba(255,255,255,.5);padding:6px 0;border-bottom:1px solid rgba(255,255,255,.06)">Réf. paiement</td><td style="color:#fff;text-align:right;border-bottom:1px solid rgba(255,255,255,.06)">#${payment_req_id || '—'}</td></tr>
+      <tr><td style="color:rgba(255,255,255,.5);padding:6px 0;border-bottom:1px solid rgba(255,255,255,.06)">Service</td><td style="color:#fff;font-weight:700;text-align:right;border-bottom:1px solid rgba(255,255,255,.06)">${details.label}</td></tr>
+      ${details.amount ? `<tr><td style="color:rgba(255,255,255,.5);padding:6px 0;border-bottom:1px solid rgba(255,255,255,.06)">Montant</td><td style="color:#F0C040;font-weight:700;text-align:right;border-bottom:1px solid rgba(255,255,255,.06)">${details.amount.toLocaleString('fr-FR')} XOF</td></tr>` : ""}
+      ${details.method ? `<tr><td style="color:rgba(255,255,255,.5);padding:6px 0;border-bottom:1px solid rgba(255,255,255,.06)">Méthode</td><td style="color:#fff;text-align:right;border-bottom:1px solid rgba(255,255,255,.06)">${details.method}</td></tr>` : ""}
+      ${locationStr   ? `<tr><td style="color:rgba(255,255,255,.5);padding:6px 0;border-bottom:1px solid rgba(255,255,255,.06)">Pays / Réseau</td><td style="color:#fff;text-align:right;border-bottom:1px solid rgba(255,255,255,.06)">${locationStr}</td></tr>` : ""}
+      ${details.phone ? `<tr><td style="color:rgba(255,255,255,.5);padding:6px 0;border-bottom:1px solid rgba(255,255,255,.06)">Téléphone</td><td style="color:#fff;text-align:right;border-bottom:1px solid rgba(255,255,255,.06)">${details.phone}</td></tr>` : ""}
+      <tr><td style="color:rgba(255,255,255,.5);padding:6px 0;border-bottom:1px solid rgba(255,255,255,.06)">Client</td><td style="color:#fff;text-align:right;border-bottom:1px solid rgba(255,255,255,.06)">${details.user}</td></tr>
+      <tr><td style="color:rgba(255,255,255,.5);padding:6px 0">Date / Heure</td><td style="color:#fff;text-align:right">${failDateStr}</td></tr>
     </table>
-    <p style="margin-top:20px;color:rgba(255,255,255,.6);font-size:.85rem">Vérifiez le panneau d'administration pour valider ou annuler ce paiement.</p>
+    <p style="margin-top:20px;color:rgba(255,255,255,.6);font-size:.85rem">Vérifiez le panneau d'administration pour valider ou annuler ce paiement manuellement.</p>
   </div>
 </div>`;
     await gmailTransport.sendMail({
       from: `"Sossou Kouamé Alerte" <${adminEmail}>`,
       to: adminEmail,
-      subject: `⚠️ Paiement non validé #${payment_req_id || '?'} — ${details.label}`,
+      subject: `⚠️ Paiement échoué #${payment_req_id || '?'} — ${details.label} — ${failDateStr}`,
       html,
     });
     console.log("[TIMEOUT-NOTIFY] Alerte envoyée pour paiement", payment_req_id);
@@ -707,12 +760,58 @@ app.post("/webhook", async (req, res) => {
   res.status(200).send("OK");
 });
 
+// ─── HELPER: Email admin — paiement réussi ───────────────────────────────
+async function sendAdminSuccessEmail(pr) {
+  try {
+    const amtXof = Math.round((pr.amount_usd || 0) * 656);
+    const amtStr = amtXof > 0 ? `${amtXof.toLocaleString('fr-FR')} XOF` : '—';
+    let clientName = 'Invité';
+    if (pr.user_id && pr.user_id > 0) {
+      const u = await pool.query("SELECT username, first_name, last_name FROM users WHERE id = $1", [pr.user_id]);
+      if (u.rows.length) {
+        const row = u.rows[0];
+        clientName = [row.first_name, row.last_name].filter(Boolean).join(' ') || row.username || 'Invité';
+      }
+    }
+    const html = `
+<div style="font-family:Arial,sans-serif;max-width:560px;background:#0a1a0f;color:#fff;border-radius:12px;overflow:hidden">
+  <div style="background:#10B981;padding:20px 28px">
+    <h2 style="margin:0;color:#fff">✅ Paiement réussi — Confirmation</h2>
+  </div>
+  <div style="padding:28px">
+    <p style="color:rgba(255,255,255,.85)">Un paiement vient d'être <strong style="color:#10B981">validé et confirmé</strong>.</p>
+    <table style="width:100%;border-collapse:collapse;font-size:.9rem;margin-top:12px">
+      <tr><td style="color:rgba(255,255,255,.5);padding:5px 0">Réf. paiement</td><td style="color:#fff;text-align:right">#${pr.id}</td></tr>
+      <tr><td style="color:rgba(255,255,255,.5);padding:5px 0">Service</td><td style="color:#fff;font-weight:700;text-align:right">${pr.plan_label || '—'}</td></tr>
+      <tr><td style="color:rgba(255,255,255,.5);padding:5px 0">Montant</td><td style="color:#F0C040;font-weight:700;text-align:right">${amtStr}</td></tr>
+      ${pr.payment_method ? `<tr><td style="color:rgba(255,255,255,.5);padding:5px 0">Méthode</td><td style="color:#fff;text-align:right">${pr.payment_method}</td></tr>` : ''}
+      ${pr.phone_number   ? `<tr><td style="color:rgba(255,255,255,.5);padding:5px 0">Téléphone</td><td style="color:#fff;text-align:right">${pr.phone_number}</td></tr>` : ''}
+      <tr><td style="color:rgba(255,255,255,.5);padding:5px 0">Client</td><td style="color:#fff;text-align:right">${clientName}</td></tr>
+      <tr><td style="color:rgba(255,255,255,.5);padding:5px 0">Statut</td><td style="color:#10B981;font-weight:700;text-align:right">✓ Validé</td></tr>
+    </table>
+    <p style="margin-top:20px;color:rgba(255,255,255,.6);font-size:.85rem">Connectez-vous au panneau d'administration pour voir les détails.</p>
+  </div>
+</div>`;
+    await gmailTransport.sendMail({
+      from: '"Sossou Kouamé Paiement" <sossoukouam@gmail.com>',
+      to: 'sossoukouam@gmail.com',
+      subject: `✅ Paiement réussi #${pr.id} — ${pr.plan_label || 'Paiement'} — ${amtStr}`,
+      html,
+    });
+    console.log("[SUCCESS-NOTIFY] Email admin envoyé pour paiement", pr.id);
+  } catch (e) {
+    console.error("[SUCCESS-NOTIFY-ERR]", e.message);
+  }
+}
+
 // ─── HELPER: Activer l'abonnement / achat ────────────────────────────────
 async function activateSubscription(pr) {
   await pool.query(
     "UPDATE payment_requests SET status = 'validated', admin_validated_at = NOW() WHERE id = $1",
     [pr.id]
   );
+  // Notifier l'admin du succès du paiement
+  sendAdminSuccessEmail(pr).catch(() => {});
 
   const pid = String(pr.plan_id);
 
@@ -791,8 +890,6 @@ app.post("/api/create-service-payment", requireAuth, async (req, res) => {
     return res.status(400).json({ error: "Type de service invalide" });
   if (!amount_xof || Number(amount_xof) <= 0)
     return res.status(400).json({ error: "Montant invalide" });
-  if (!numeroSend || String(numeroSend).trim().length < 8)
-    return res.status(400).json({ error: "Numéro de téléphone requis (min 8 chiffres)" });
 
   const label = service_type === "telegram" ? "Service Telegram" : "Service de Maintenance";
   const labelFull = description ? `${label} — ${description}` : label;
@@ -811,7 +908,7 @@ app.post("/api/create-service-payment", requireAuth, async (req, res) => {
       `INSERT INTO payment_requests
          (user_id, plan_id, plan_label, amount_usd, duration_minutes, payment_method, status, phone_number)
        VALUES ($1,$2,$3,$4,0,'mobile_money','pending',$5) RETURNING id`,
-      [req.session.userId, plan_id, labelFull, amount_usd, String(numeroSend).trim()]
+      [req.session.userId, plan_id, labelFull, amount_usd, numeroSend ? String(numeroSend).trim() : null]
     );
     const payReqId = dbRes.rows[0].id;
 
@@ -821,9 +918,9 @@ app.post("/api/create-service-payment", requireAuth, async (req, res) => {
     const paymentData = {
       totalPrice: parseInt(amount_xof, 10),
       article:    [{ [labelFull]: parseInt(amount_xof, 10) }],
-      numeroSend: String(numeroSend).trim(),
       nomclient,
       return_url,
+      ...(numeroSend ? { numeroSend: String(numeroSend).trim() } : {}),
     };
 
     console.log("[SERVICE-PAY] Appel Money Fusion:", JSON.stringify(paymentData));
@@ -890,14 +987,12 @@ app.post("/api/create-support-public", async (req, res) => {
   const allTiers = await getSupportTiers();
   const tier = allTiers.find(t => t.id === tier_id);
   if (!tier) return res.status(400).json({ error: "Palier de soutien invalide" });
-  if (!numeroSend || String(numeroSend).trim().length < 8)
-    return res.status(400).json({ error: "Numéro de téléphone requis (min 8 chiffres)" });
 
   const nom = (nomclient || "Donateur").trim() || "Donateur";
   const price_usd = parseFloat((tier.price_xof / 650).toFixed(2));
 
   try {
-    const phoneNum = String(numeroSend).trim();
+    const phoneNum = numeroSend ? String(numeroSend).trim() : null;
     const dbRes = await pool.query(
       `INSERT INTO payment_requests
          (user_id, plan_id, plan_label, amount_usd, duration_minutes, payment_method, status, phone_number)
@@ -920,9 +1015,9 @@ app.post("/api/create-support-public", async (req, res) => {
     const paymentData = {
       totalPrice: tier.price_xof,
       article:    [{ [tier.label]: tier.price_xof }],
-      numeroSend: String(numeroSend).trim(),
       nomclient:  nom,
       return_url,
+      ...(phoneNum ? { numeroSend: phoneNum } : {}),
     };
 
     console.log("[SUPPORT-PUBLIC] Appel Money Fusion:", JSON.stringify(paymentData));
@@ -955,9 +1050,6 @@ app.post("/api/create-support", requireAuth, async (req, res) => {
   const allTiers = await getSupportTiers();
   const tier = allTiers.find(t => t.id === tier_id);
   if (!tier) return res.status(400).json({ error: "Palier de soutien invalide" });
-  if (!numeroSend || String(numeroSend).trim().length < 8) {
-    return res.status(400).json({ error: "Numéro de téléphone requis (min 8 chiffres)" });
-  }
 
   try {
     const userRes = await pool.query(
@@ -966,6 +1058,7 @@ app.post("/api/create-support", requireAuth, async (req, res) => {
     );
     const u = userRes.rows[0];
     const nomclient = [u.first_name, u.last_name].filter(Boolean).join(" ") || u.username;
+    const phoneNum  = numeroSend ? String(numeroSend).trim() : null;
 
     const price_usd = parseFloat((tier.price_xof / 650).toFixed(2));
 
@@ -973,7 +1066,7 @@ app.post("/api/create-support", requireAuth, async (req, res) => {
       `INSERT INTO payment_requests
          (user_id, plan_id, plan_label, amount_usd, duration_minutes, payment_method, status, phone_number)
        VALUES ($1,$2,$3,$4,0,'mobile_money','pending',$5) RETURNING id`,
-      [req.session.userId, tier.id, tier.label, price_usd, String(numeroSend).trim()]
+      [req.session.userId, tier.id, tier.label, price_usd, phoneNum]
     );
     const payReqId = dbRes.rows[0].id;
 
@@ -983,9 +1076,9 @@ app.post("/api/create-support", requireAuth, async (req, res) => {
     const paymentData = {
       totalPrice: tier.price_xof,
       article:    [{ [tier.label]: tier.price_xof }],
-      numeroSend: String(numeroSend).trim(),
       nomclient,
       return_url,
+      ...(phoneNum ? { numeroSend: phoneNum } : {}),
     };
 
     console.log("[SUPPORT] Appel Money Fusion:", JSON.stringify(paymentData));

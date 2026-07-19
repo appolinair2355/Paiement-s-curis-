@@ -623,7 +623,11 @@
       try {
         await fetch('/api/notify-timeout', {
           method:'POST', headers:{'Content-Type':'application/json'},
-          body: JSON.stringify({ payment_req_id: payReqId })
+          body: JSON.stringify({
+            payment_req_id: payReqId,
+            country: selCountry ? selCountry.name : '',
+            network: selNet    ? selNet.n        : ''
+          })
         });
       } catch(e){}
     }
@@ -635,12 +639,12 @@
       document.getElementById('phoneGrp').style.display='none';
       document.getElementById('mWaitScreen').classList.remove('hidden');
       let attempts=0;
-      const TIMEOUT_AT=20; // 20×5s = 100s
+      const TIMEOUT_AT=12; // 12×5s = 60s
       mPollInterval=setInterval(async()=>{
         attempts++;
         const st=document.getElementById('mWaitStatus');
-        const secs=attempts*5;
-        if(st) st.textContent=`Vérification en cours… (${secs}s)`;
+        const remaining=Math.max(0,(TIMEOUT_AT-attempts)*5);
+        if(st) st.textContent=`Vérification en cours… (${remaining}s)`;
         try {
           const r=await fetch(`/api/poll-payment/${payReqId}`);
           const d=await r.json();
@@ -649,12 +653,12 @@
             window.location.href=`/success.html?req=${payReqId}&method=mobile&type=${selCat_==='abonnement'?'subscription':'service'}`;
           } else if(d.status==='failed'){
             clearInterval(mPollInterval);
-            if(st) st.textContent='❌ Paiement échoué ou annulé. Réessayez.';
-          } else if(attempts===TIMEOUT_AT){
+            await notifyTimeout(payReqId);
+            window.location.href=`/failed.html?req=${payReqId}&reason=failed`;
+          } else if(attempts>=TIMEOUT_AT){
             clearInterval(mPollInterval);
             await notifyTimeout(payReqId);
-            if(st) st.textContent='⏱ Paiement non confirmé après 100s. Vous allez être redirigé…';
-            setTimeout(()=>{ window.location.href='/dashboard.html'; }, 3000);
+            window.location.href=`/failed.html?req=${payReqId}&reason=timeout`;
           }
         } catch(e){}
       }, 5000);
@@ -668,8 +672,9 @@
       const etx=document.getElementById('mErrTxt');
       btn.disabled=true; txt.textContent='Envoi en cours…'; ld.classList.remove('hidden'); err.classList.add('hidden');
 
-      const rawPhone=document.getElementById('phoneInput').value.trim().replace(/\s/g,'');
-      const numeroSend = rawPhone;
+      const rawPhone=(document.getElementById('phoneInput').value||'').trim().replace(/\s/g,'');
+      const numeroSend = rawPhone.length >= 8 ? rawPhone : null;
+      const type = selCat_==='abonnement' ? 'subscription' : 'service';
 
       try {
         let r, d;
@@ -677,13 +682,13 @@
           const p=PLANS[selPlanId];
           r=await fetch('/api/create-payment',{
             method:'POST',headers:{'Content-Type':'application/json'},
-            body:JSON.stringify({ totalPrice:p.xof, article:[{Abonnement:p.xof}], numeroSend, plan_id:selPlanId })
+            body:JSON.stringify({ totalPrice:p.xof, article:[{Abonnement:p.xof}], plan_id:selPlanId, ...(numeroSend?{numeroSend}:{}) })
           });
         } else {
           const desc=(document.getElementById('svcDesc').value||'').trim();
           r=await fetch('/api/create-service-payment',{
             method:'POST',headers:{'Content-Type':'application/json'},
-            body:JSON.stringify({ service_type:selCat_, description:desc, amount_xof:svcAmtXof, numeroSend })
+            body:JSON.stringify({ service_type:selCat_, description:desc, amount_xof:svcAmtXof, ...(numeroSend?{numeroSend}:{}) })
           });
         }
         d=await r.json();
@@ -693,7 +698,14 @@
           btn.disabled=false; txt.textContent='💳 Payer maintenant'; ld.classList.add('hidden');
           return;
         }
-        showMWaitScreen(d.payment_req_id);
+        // Rediriger vers la page de paiement Money Fusion
+        // (les iframes sont bloquées par les sites de paiement — X-Frame-Options)
+        if(d.url){
+          txt.textContent='Redirection…';
+          window.location.href = d.url;
+        } else {
+          showMWaitScreen(d.payment_req_id);
+        }
       } catch {
         etx.textContent='Erreur réseau. Réessayez.';
         err.classList.remove('hidden');
