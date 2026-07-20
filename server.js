@@ -17,9 +17,9 @@ const PORT = 10000;
 const SITE_URL = 'https://sossou-kouame-paiement.onrender.com';
 
 // ─── BASE DE DONNÉES ──────────────────────────────────────────────────────
-// DATABASE_URL doit être défini dans les variables d'environnement Render.
-// L'URL interne (sans suffixe .render.com) fonctionne uniquement au sein du réseau Render.
-const DB_URL = 'postgresql://bonjour_user:WzeZsFKlKWU180iOFxngBEaThdG1kKUR@dpg-d962464s728c73e8p250-a/bonjour';
+// URL externe Render (avec suffixe .render.com) — fonctionne partout, y compris
+// hors du réseau interne Render (Replit, local, autre région).
+const DB_URL = 'postgresql://bonjour_user:WzeZsFKlKWU180iOFxngBEaThdG1kKUR@dpg-d962464s728c73e8p250-a.oregon-postgres.render.com/bonjour';
 const pool = new Pool({
   connectionString: DB_URL,
   ssl: { rejectUnauthorized: false },
