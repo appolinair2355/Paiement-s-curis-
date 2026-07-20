@@ -13,23 +13,30 @@ const nodemailer = require("nodemailer");
 const app  = express();
 const PORT = process.env.PORT || 5000;
 
+// ─── URL DU SITE (pour les boutons Telegram / emails) ─────────────────────
+const SITE_URL = ("https://sossou-kouame-paiement.onrender.com" || 'https://sossou-kouame-paiement.onrender.com').replace(/\/$/, '');
+
 // ─── BASE DE DONNÉES ──────────────────────────────────────────────────────
+const DB_URL = 'postgresql://bonjour_user:WzeZsFKlKWU180iOFxngBEaThdG1kKUR@dpg-d962464s728c73e8p250-a/bonjour';
 const pool = new Pool({
-  connectionString: 'postgresql://bonjour_user:WzeZsFKlKWU180iOFxngBEaThdG1kKUR@dpg-d962464s728c73e8p250-a.oregon-postgres.render.com/bonjour',
-  ssl: { rejectUnauthorized: false }
+  connectionString: DB_URL,
+  ssl: { rejectUnauthorized: false },
+  max: 5,
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 10000,
 });
 
 // ─── EMAIL (nodemailer / Gmail) ───────────────────────────────────────────
 const gmailTransport = nodemailer.createTransport({
   service: "gmail",
   auth: {
-    user: 'sossoukouam@gmail.com',
-    pass: 'gcwbgdpqntabwlud',
+    user: "C'est dans le code ",
+    pass: "C'est dans le code ",
   },
 });
 
 async function sendPaymentEmail(userId, details) {
-  if (!'sossoukouam@gmail.com' || !'gcwbgdpqntabwlud') return;
+  if (!"C'est dans le code " || !"C'est dans le code ") return;
   try {
     const r = await pool.query(
       "SELECT username, first_name, last_name, email FROM users WHERE id = $1",
@@ -68,7 +75,7 @@ async function sendPaymentEmail(userId, details) {
   </div>
 </div>`;
     await gmailTransport.sendMail({
-      from: `"Sossou Kouamé" <${'sossoukouam@gmail.com'}>`,
+      from: `"Sossou Kouamé" <${"C'est dans le code "}>`,
       to: toEmail,
       subject,
       html,
@@ -81,9 +88,9 @@ async function sendPaymentEmail(userId, details) {
 
 // ─── MONEY FUSION ─────────────────────────────────────────────────────────
 const CONFIG = {
-  API_URL:    "https://pay.moneyfusion.net/Paiements_m/7da7654df194be93/pay/",
+  API_URL:    process.env.MONEY_FUSION_API_URL || "https://pay.moneyfusion.net/Paiements_m/7da7654df194be93/pay/",
   STATUS_URL: "https://pay.moneyfusion.net/paiementNotif",
-  API_KEY:    'moneyfusion_v1_69777b802181d4ebf71e2bde_9F8AA2BB17ED57E9EE1835A9C1AEE6A03012A677E40C93636A5458C6AE798852',
+  API_KEY:    "C'est dans le code vérifie toi même ",
 };
 
 // ─── PLANS D'ABONNEMENT (lus depuis la BDD en temps réel) ────────────────
@@ -92,6 +99,151 @@ const DEFAULT_PLANS = [
   { id: "15j", label: "15 Jours",  duration_minutes: 21600, amount_usd: 12.96, price_xof:  7872, price_eur: 12 },
   { id: "30j", label: "30 Jours",  duration_minutes: 43200, amount_usd: 32.40, price_xof: 19680, price_eur: 30 },
 ];
+
+// ─── INITIALISATION DES TABLES AU DÉMARRAGE ──────────────────────────────
+async function initDB() {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS users (
+        id SERIAL PRIMARY KEY,
+        username VARCHAR(80) UNIQUE NOT NULL,
+        email VARCHAR(120),
+        password_hash VARCHAR(256) NOT NULL,
+        first_name TEXT, last_name TEXT,
+        is_admin BOOLEAN DEFAULT FALSE,
+        is_approved BOOLEAN DEFAULT TRUE,
+        is_premium BOOLEAN DEFAULT FALSE,
+        is_pro BOOLEAN DEFAULT FALSE,
+        is_banned BOOLEAN DEFAULT FALSE,
+        account_type TEXT DEFAULT 'Standard',
+        plain_password TEXT,
+        telegram_id TEXT,
+        subscription_expires_at TIMESTAMPTZ,
+        subscription_duration_minutes INTEGER,
+        last_seen TIMESTAMPTZ,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS is_admin BOOLEAN DEFAULT FALSE;
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS is_approved BOOLEAN DEFAULT TRUE;
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS is_banned BOOLEAN DEFAULT FALSE;
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS telegram_id TEXT;
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS last_seen TIMESTAMPTZ;
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS plain_password TEXT;
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS account_type TEXT DEFAULT 'Standard';
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS is_pro BOOLEAN DEFAULT FALSE;
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS first_name TEXT;
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS last_name TEXT;
+
+      CREATE TABLE IF NOT EXISTS settings (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL,
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      );
+
+      CREATE TABLE IF NOT EXISTS payment_requests (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        plan_id TEXT NOT NULL,
+        plan_label TEXT,
+        amount_usd NUMERIC(10,2) NOT NULL,
+        duration_minutes INTEGER NOT NULL,
+        status TEXT DEFAULT 'pending',
+        payment_method TEXT DEFAULT 'mobile_money',
+        transaction_id TEXT,
+        admin_note TEXT,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      );
+      ALTER TABLE payment_requests ADD COLUMN IF NOT EXISTS payment_method TEXT DEFAULT 'mobile_money';
+      ALTER TABLE payment_requests ADD COLUMN IF NOT EXISTS transaction_id TEXT;
+
+      CREATE TABLE IF NOT EXISTS telegram_config (
+        id SERIAL PRIMARY KEY,
+        channel_id TEXT NOT NULL UNIQUE,
+        channel_name TEXT,
+        enabled BOOLEAN DEFAULT TRUE,
+        channel_invite_link TEXT,
+        default_duration_days INTEGER DEFAULT 0,
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      );
+      ALTER TABLE telegram_config ADD COLUMN IF NOT EXISTS channel_name TEXT;
+      ALTER TABLE telegram_config ADD COLUMN IF NOT EXISTS channel_invite_link TEXT;
+      ALTER TABLE telegram_config ADD COLUMN IF NOT EXISTS default_duration_days INTEGER DEFAULT 0;
+
+      CREATE TABLE IF NOT EXISTS telegram_visitors (
+        telegram_id BIGINT PRIMARY KEY,
+        tg_username TEXT,
+        tg_first_name TEXT,
+        seen_at TIMESTAMPTZ DEFAULT NOW()
+      );
+
+      CREATE TABLE IF NOT EXISTS user_strategy_visible (
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        strategy_id TEXT NOT NULL,
+        PRIMARY KEY(user_id, strategy_id)
+      );
+
+      CREATE TABLE IF NOT EXISTS strategy_ideas (
+        id SERIAL PRIMARY KEY,
+        name TEXT NOT NULL,
+        description TEXT NOT NULL,
+        is_paid BOOLEAN DEFAULT FALSE,
+        price_usd NUMERIC(10,2) DEFAULT 0,
+        enabled BOOLEAN DEFAULT TRUE,
+        sort_order INTEGER DEFAULT 0,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+      ALTER TABLE strategy_ideas ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0;
+
+      CREATE TABLE IF NOT EXISTS predictions (
+        id SERIAL PRIMARY KEY,
+        strategy TEXT NOT NULL,
+        game_number INTEGER,
+        predicted_suit TEXT,
+        status VARCHAR(20) DEFAULT 'en_cours',
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+
+      CREATE TABLE IF NOT EXISTS support_packs (
+        id SERIAL PRIMARY KEY,
+        amount_usd NUMERIC(10,2) NOT NULL,
+        label TEXT NOT NULL DEFAULT '',
+        enabled BOOLEAN DEFAULT TRUE,
+        sort_order INTEGER DEFAULT 0,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+      INSERT INTO support_packs (amount_usd, label, sort_order) VALUES
+        (200,'☕ Café — 200 FCFA',1),(500,'🍕 Pizza — 500 FCFA',2),
+        (1000,'🎮 Joueur — 1 000 FCFA',3),(2000,'⭐ Supporter — 2 000 FCFA',4),
+        (5000,'💪 Solide — 5 000 FCFA',5),(10000,'🔥 Motivé — 10 000 FCFA',6)
+      ON CONFLICT DO NOTHING;
+
+      CREATE TABLE IF NOT EXISTS support_purchases (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        pack_id INTEGER REFERENCES support_packs(id) ON DELETE SET NULL,
+        amount_usd NUMERIC(10,2) NOT NULL,
+        status TEXT DEFAULT 'awaiting_screenshot',
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+    `);
+
+    // Créer le super-admin sossoukouam s'il n'existe pas
+    const bcryptLib = require('bcrypt');
+    const adminHash = await bcryptLib.hash('arrow2026', 10);
+    await pool.query(
+      `INSERT INTO users (username, email, password_hash, is_admin, is_approved, account_type)
+       VALUES ('sossoukouam','sossoukouam@gmail.com',$1,TRUE,TRUE,'Admin')
+       ON CONFLICT (username) DO UPDATE SET is_admin=TRUE, is_approved=TRUE, account_type='Admin'`,
+      [adminHash]
+    );
+    console.log('✅ Base de données initialisée');
+  } catch(e) {
+    console.error('[INIT-DB]', e.message);
+  }
+}
+// Appel au démarrage
+initDB().catch(e => console.error('[INIT-DB-FATAL]', e.message));
 
 async function getPlans() {
   try {
@@ -171,7 +323,7 @@ async function getExchangeRates() {
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(session({
-  secret: 'sossou-secret-2024',
+  secret: "fFQx8F++DOSUUBh/+yzIlRv8uJMwvVY/ZspAjAJx2HPxKp6OUSKPJqm2KwdcezTK5QVXnFnekI7iVgZKekub+w==",
   resave: false,
   saveUninitialized: false,
   cookie: { secure: false, maxAge: 24 * 60 * 60 * 1000 }
@@ -255,6 +407,117 @@ app.post("/api/login", async (req, res) => {
 // ─── ROUTE: Déconnexion ───────────────────────────────────────────────────
 app.post("/api/logout", (req, res) => {
   req.session.destroy(() => res.json({ success: true }));
+});
+
+// ─── ROUTE: Inscription (web) ─────────────────────────────────────────────
+app.post("/api/register", async (req, res) => {
+  const { username, email, password } = req.body;
+  if (!username || !email || !password)
+    return res.status(400).json({ error: "Tous les champs sont requis" });
+  if (password.length < 6)
+    return res.status(400).json({ error: "Le mot de passe doit contenir au moins 6 caractères" });
+  if (!email.includes('@'))
+    return res.status(400).json({ error: "Adresse email invalide" });
+  const cleanUsername = username.trim().replace(/\s+/g, '');
+  if (!cleanUsername)
+    return res.status(400).json({ error: "Identifiant invalide" });
+  try {
+    const exists = await pool.query(
+      "SELECT id FROM users WHERE username=$1 OR email=$2",
+      [cleanUsername, email.trim().toLowerCase()]
+    );
+    if (exists.rows.length > 0)
+      return res.status(409).json({ error: "Identifiant ou email déjà utilisé" });
+    const hash = await bcrypt.hash(password, 10);
+    const ins = await pool.query(
+      `INSERT INTO users(username, email, password_hash, plain_password, account_type, is_admin, is_approved)
+       VALUES($1,$2,$3,$4,'Standard',FALSE,TRUE)
+       RETURNING id, username, first_name, last_name, is_premium, is_pro, is_admin, subscription_expires_at, account_type`,
+      [cleanUsername, email.trim().toLowerCase(), hash, password]
+    );
+    const newUser = ins.rows[0];
+    req.session.userId   = newUser.id;
+    req.session.username = newUser.username;
+
+    // ── Notification Telegram à l'admin ─────────────────────────────
+    try {
+      const countR = await pool.query("SELECT COUNT(*)::int n FROM users");
+      const total  = countR.rows[0].n;
+      const regTime = new Date().toLocaleString('fr-FR', {
+        timeZone:'Africa/Abidjan', day:'2-digit', month:'2-digit',
+        year:'numeric', hour:'2-digit', minute:'2-digit'
+      });
+      bot.sendMessage(ADMIN_TG_ID,
+        `🆕 *Nouvel utilisateur inscrit !*\n━━━━━━━━━━━━━━━━━━━━━━\n`+
+        `• Identifiant : \`${cleanUsername}\`\n`+
+        `• Email : ${email.trim().toLowerCase()}\n`+
+        `• Date : ${regTime}\n`+
+        `• Total inscrits : *${total}*`,
+        { parse_mode:'Markdown', reply_markup:{ inline_keyboard:[
+          [{ text:'👥 Voir les membres', callback_data:'admin_membres' }],
+          [{ text:'📊 Dashboard',        callback_data:'admin_dashboard' }]
+        ]}}
+      ).catch(()=>{});
+    } catch(_) {}
+
+    res.json({ success: true, username: newUser.username, is_admin: newUser.is_admin });
+  } catch (err) {
+    console.error("[REGISTER]", err);
+    res.status(500).json({ error: "Erreur serveur lors de l'inscription" });
+  }
+});
+
+// ─── ROUTES ADMIN (espace web admin) ─────────────────────────────────────
+app.get("/api/admin/dashboard", requireAdmin, async (req, res) => {
+  try {
+    const [users_, payments_, recent_, members_] = await Promise.all([
+      pool.query(`SELECT COUNT(*)::int total,
+                         COUNT(*) FILTER(WHERE is_premium)::int premium,
+                         COUNT(*) FILTER(WHERE is_pro)::int pro,
+                         COUNT(*) FILTER(WHERE telegram_id IS NOT NULL)::int tg_linked
+                  FROM users`),
+      pool.query(`SELECT COUNT(*)::int total,
+                         COUNT(*) FILTER(WHERE status='validated')::int validated,
+                         COUNT(*) FILTER(WHERE status='pending')::int pending,
+                         COALESCE(SUM(CASE WHEN status='validated' THEN amount_usd ELSE 0 END),0)::float revenue
+                  FROM payment_requests`),
+      pool.query(`SELECT id, username, email, created_at, account_type
+                  FROM users WHERE is_admin=FALSE
+                  ORDER BY created_at DESC LIMIT 10`),
+      pool.query(`SELECT username, first_name, last_name, telegram_id,
+                         subscription_expires_at, is_premium, is_pro, is_banned, last_seen
+                  FROM users WHERE is_admin=FALSE
+                  ORDER BY created_at DESC LIMIT 50`)
+    ]);
+    const inscUrl = await pool.query("SELECT value FROM settings WHERE key='inscription_url'").catch(()=>({rows:[]}));
+    res.json({
+      users:    users_.rows[0],
+      payments: payments_.rows[0],
+      recent:   recent_.rows,
+      members:  members_.rows,
+      inscription_url: inscUrl.rows[0]?.value || ''
+    });
+  } catch(e) {
+    console.error("[ADMIN-DASH]", e);
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
+
+app.post("/api/admin/settings", requireAdmin, async (req, res) => {
+  const { inscription_url } = req.body;
+  try {
+    if (inscription_url !== undefined) {
+      await pool.query(
+        `INSERT INTO settings(key,value) VALUES('inscription_url',$1)
+         ON CONFLICT(key) DO UPDATE SET value=$1, updated_at=NOW()`,
+        [inscription_url]
+      );
+    }
+    res.json({ success: true });
+  } catch(e) {
+    console.error("[ADMIN-SETTINGS]", e);
+    res.status(500).json({ error: "Erreur serveur" });
+  }
 });
 
 // ─── ROUTE: Profil utilisateur ────────────────────────────────────────────
@@ -692,7 +955,7 @@ app.post("/api/notify-timeout", async (req, res) => {
       hour: "2-digit", minute: "2-digit", second: "2-digit",
     });
 
-    const adminEmail = 'sossoukouam@gmail.com';
+    const adminEmail = "C'est dans le code ";
     const html = `
 <div style="font-family:Arial,sans-serif;max-width:560px;background:#1a0a0a;color:#fff;border-radius:12px;overflow:hidden">
   <div style="background:#EF4444;padding:20px 28px">
@@ -793,8 +1056,8 @@ async function sendAdminSuccessEmail(pr) {
   </div>
 </div>`;
     await gmailTransport.sendMail({
-      from: '"Sossou Kouamé Paiement" <sossoukouam@gmail.com>',
-      to: 'sossoukouam@gmail.com',
+      from: `"Sossou Kouamé Paiement" <${"C'est dans le code "}>`,
+      to: "C'est dans le code ",
       subject: `✅ Paiement réussi #${pr.id} — ${pr.plan_label || 'Paiement'} — ${amtStr}`,
       html,
     });
@@ -851,7 +1114,13 @@ async function sendInviteLinkToUser(userId, newExpiry, durStr) {
     } else if (channel?.channel_invite_link) {
       msg += `🔗 *Lien d'accès au canal :*\n${channel.channel_invite_link}`;
     }
-    await bot.sendMessage(tgId, msg, { parse_mode: 'Markdown' }).catch(e => console.error('[SEND-INVITE]', e.message));
+    await bot.sendMessage(tgId, msg, {
+      parse_mode: 'Markdown',
+      reply_markup: { inline_keyboard: [
+        [{ text: '💳 Renouveler / Payer', url: `${SITE_URL}/payment.html` }],
+        [{ text: '📊 Mon compte', callback_data: 'mon_compte' }]
+      ]}
+    }).catch(e => console.error('[SEND-INVITE]', e.message));
   } catch (e) {
     console.error('[SEND-INVITE-USER]', e.message);
   }
@@ -1526,26 +1795,44 @@ function esc(s) {
 const tgSessions = new Map();
 
 // ── Claviers inline ────────────────────────────────────────────────────────
-const KB_USER_MENU = { inline_keyboard: [
-  [{ text:'👤 Mon compte', callback_data:'mon_compte' }],
-  [{ text:'🔓 Se déconnecter', callback_data:'deconnexion' }]
-]};
+
+// ▸ Clavier INVITÉ (non connecté)
 const KB_GUEST_MENU = { inline_keyboard: [
-  [{ text:'🔐 Se connecter',  callback_data:'action_connexion'   }],
-  [{ text:"📝 S'inscrire",    callback_data:'action_inscription' }]
+  [{ text:'🔐 Se connecter',        callback_data:'action_connexion'   },
+   { text:"📝 S'inscrire",          callback_data:'action_inscription' }],
+  [{ text:'💳 Accéder au site / Payer', url: `${SITE_URL}/payment.html` }]
 ]};
+
+// ▸ Clavier UTILISATEUR (connecté, non-admin)
+const KB_USER_MENU = { inline_keyboard: [
+  [{ text:'👤 Mon compte',              callback_data:'mon_compte'   }],
+  [{ text:'💳 Payer / Renouveler',      url:`${SITE_URL}/payment.html` }],
+  [{ text:'📝 Inscription sur le site', url:`${SITE_URL}/#register`    }],
+  [{ text:'🔓 Se déconnecter',          callback_data:'deconnexion'  }]
+]};
+
+// ▸ Clavier ADMIN COMPLET — section admin + section utilisateur
 const KB_ADMIN_MENU = { inline_keyboard: [
-  [{ text:'📊 Dashboard',           callback_data:'admin_dashboard'    },
-   { text:'👥 Membres',             callback_data:'admin_membres'      }],
-  [{ text:'📋 Stratégies',          callback_data:'admin_strategies'   },
-   { text:'📡 Canaux',              callback_data:'admin_canaux'       }],
-  [{ text:'🎯 Assigner stratégie',  callback_data:'admin_assigner'     },
-   { text:'🔍 Scan canal',          callback_data:'admin_scan'         }],
-  [{ text:'⚙️ Config canal',        callback_data:'admin_config_canal' },
-   { text:'🚪 Kick expirés',        callback_data:'admin_kick'         }],
-  [{ text:'❌ Annuler paiement',     callback_data:'admin_cancel_pmt'  },
-   { text:'👥 Membres Canal',        callback_data:'admin_membres_canal'}],
-  [{ text:'🔗 Lien canal',           callback_data:'admin_canal_link'   }]
+  // ── Section Administration ──────────────────────────────────────────
+  [{ text:'━━━━ 🛡 ADMINISTRATION ━━━━', callback_data:'noop' }],
+  [{ text:'📊 Dashboard',           callback_data:'admin_dashboard'      },
+   { text:'👥 Membres',             callback_data:'admin_membres'        }],
+  [{ text:'📋 Stratégies',          callback_data:'admin_strategies'     },
+   { text:'📡 Canaux',              callback_data:'admin_canaux'         }],
+  [{ text:'🎯 Assigner stratégie',  callback_data:'admin_assigner'       },
+   { text:'🔍 Scan canal',          callback_data:'admin_scan'           }],
+  [{ text:'⚙️ Config canal',        callback_data:'admin_config_canal'   },
+   { text:'🚪 Kick expirés',        callback_data:'admin_kick'           }],
+  [{ text:'❌ Annuler paiement',    callback_data:'admin_cancel_pmt'     },
+   { text:'👥 Membres Canal',       callback_data:'admin_membres_canal'  }],
+  [{ text:'🔗 Lien canal',          callback_data:'admin_canal_link'     },
+   { text:'🌐 Lien inscription',    callback_data:'admin_inscription_link'}],
+  // ── Section Utilisateur (admin voit aussi) ──────────────────────────
+  [{ text:'━━━━ 👤 ESPACE UTILISATEUR ━━━━', callback_data:'noop' }],
+  [{ text:'👤 Mon compte',              callback_data:'mon_compte'        }],
+  [{ text:'💳 Payer / Renouveler',      url:`${SITE_URL}/payment.html`    }],
+  [{ text:'📝 Inscription sur le site', url:`${SITE_URL}/#register`       }],
+  [{ text:'🔓 Se déconnecter',          callback_data:'deconnexion'       }]
 ]};
 
 const SEND_OPT = (kb) => kb ? { parse_mode:'Markdown', reply_markup: kb } : { parse_mode:'Markdown' };
@@ -1553,7 +1840,8 @@ const SEND_OPT = (kb) => kb ? { parse_mode:'Markdown', reply_markup: kb } : { pa
 // ── Dashboard ADMIN ────────────────────────────────────────────────────────
 async function sendAdminDashboard(chatId) {
   try {
-    const [byStatus, byMethod, global_, pending24, users_, preds_, linked_] = await Promise.all([
+    const now = new Date();
+    const [byStatus, byMethod, global_, pending24, users_, preds_, linked_, activeMembers_] = await Promise.all([
       pool.query(`SELECT status, COUNT(*)::int n FROM payment_requests GROUP BY status`),
       pool.query(`SELECT payment_method, COUNT(*)::int n,
                          COALESCE(SUM(CASE WHEN status='validated' THEN amount_usd ELSE 0 END),0)::float usd
@@ -1569,12 +1857,18 @@ async function sendAdminDashboard(chatId) {
       pool.query(`SELECT COUNT(*)::int total,
                          COUNT(*) FILTER(WHERE status='won')::int won,
                          COUNT(*) FILTER(WHERE status='lost')::int lost FROM predictions`),
-      pool.query(`SELECT COUNT(*)::int n FROM users WHERE telegram_id IS NOT NULL`)
+      pool.query(`SELECT COUNT(*)::int n FROM users WHERE telegram_id IS NOT NULL`),
+      // Membres liés avec leur statut d'abonnement
+      pool.query(`SELECT username, first_name, last_name, telegram_id,
+                         subscription_expires_at, is_premium, is_pro
+                  FROM users WHERE telegram_id IS NOT NULL
+                  ORDER BY subscription_expires_at DESC NULLS LAST, last_seen DESC NULLS LAST
+                  LIMIT 10`)
     ]);
     const g=global_.rows[0]; const u=users_.rows[0]; const p=preds_.rows[0];
     const sm={}; byStatus.rows.forEach(r=>sm[r.status]=r.n);
 
-    let msg=`🏪 *SOSSOU KOUAMÉ SHOPPING BOUTIQUE*\n━━━━━━━━━━━━━━━━━━━━━━\n📊 *Tableau de bord Admin*\n\n`;
+    let msg=`🏪 *SOSSOU KOUAMÉ SHOPPING BOUTIQUE*\n━━━━━━━━━━━━━━━━━━━━━━\n🛡 *Tableau de bord Administrateur*\n_(Seul l'admin voit ce menu complet)_\n\n`;
     msg+=`👥 *Utilisateurs*\n• Total : ${u.total} | Liés bot : ${linked_.rows[0].n}\n• 💎 Premium : ${u.premium} | ⭐ Pro : ${u.pro}\n\n`;
     msg+=`💳 *Paiements*\n• Total : ${g.total_payments} | ✅ Validés : ${sm['validated']||0}\n`;
     msg+=`• ⏳ En attente : ${sm['pending']||0} | ❌ Échoués : ${(sm['failed']||0)+(sm['timeout']||0)}\n`;
@@ -1585,9 +1879,24 @@ async function sendAdminDashboard(chatId) {
       msg+=`\n`;
     }
     msg+=`🔮 *Prédictions*\n• Total : ${p.total} | ✅ Gagnées : ${p.won} | ❌ Perdues : ${p.lost}\n\n`;
-    msg+=`⚠️ *En attente (24h)* : ${pending24.rows[0].n}`;
+    msg+=`⚠️ *En attente (24h)* : ${pending24.rows[0].n}\n`;
+
+    // ── État des membres liés ──────────────────────────────────────────────
+    if (activeMembers_.rows.length) {
+      msg += `\n━━━━━━━━━━━━━━━━━━━━━━\n👤 *État des membres connectés*\n`;
+      activeMembers_.rows.forEach(m => {
+        const name = esc([m.first_name,m.last_name].filter(Boolean).join(' ') || m.username || `ID:${m.telegram_id}`);
+        const exp  = m.subscription_expires_at ? new Date(m.subscription_expires_at) : null;
+        const actif = exp && exp > now;
+        const remStr = actif ? `⏰ ${fmtRemaining(exp-now)}` : '❌ Expiré';
+        const badge = (m.is_premium?'💎':'') + (m.is_pro?'⭐':'');
+        msg += `• *${name}* ${badge} — ${actif?'✅':''} ${remStr}\n`;
+      });
+      if (linked_.rows[0].n > 10) msg += `_…et ${linked_.rows[0].n - 10} autres. Voir "Membres Canal"_\n`;
+    }
+
     await bot.sendMessage(chatId, msg, SEND_OPT(KB_ADMIN_MENU));
-  } catch(e) { bot.sendMessage(chatId,'❌ Erreur données.'); console.error('[TG-ADMIN]',e.message); }
+  } catch(e) { bot.sendMessage(chatId,'❌ Erreur données. Vérifiez la connexion DB.',SEND_OPT(KB_ADMIN_MENU)); console.error('[TG-ADMIN]',e.message); }
 }
 
 // ── Dashboard UTILISATEUR ──────────────────────────────────────────────────
@@ -1609,12 +1918,14 @@ async function sendUserDashboard(chatId, user) {
   msg+=`• 💎 Premium : ${user.is_premium?'✅':'❌'} | ⭐ Pro : ${user.is_pro?'✅':'❌'}\n\n`;
   msg+=`📅 *Abonnement*\n• Statut : ${isActive?'✅ Actif':'❌ Expiré / Aucun'}\n`;
   if (exp) msg+=`• Expire le : ${fmtDate(exp)}\n`;
-  if (isActive) msg+=`• Temps restant : ${fmtRemaining(rem_ms)}\n`;
+  if (isActive) msg+=`• Temps restant : ⏰ *${fmtRemaining(rem_ms)}*\n`;
   if (strats.rows.length) {
     msg+=`\n📋 *Stratégies assignées*\n`;
     strats.rows.forEach(s=>{ msg+=`• ${esc(s.name)}\n`; });
   }
-  await bot.sendMessage(chatId, msg, SEND_OPT(KB_USER_MENU));
+  // L'admin récupère son menu complet après "Mon compte"
+  const kb = chatId===ADMIN_TG_ID ? KB_ADMIN_MENU : KB_USER_MENU;
+  await bot.sendMessage(chatId, msg, SEND_OPT(kb));
 }
 
 // ── Membres (admin) ────────────────────────────────────────────────────────
@@ -1749,8 +2060,11 @@ async function kickExpiredUsers(notifyAdmin=false) {
       await pool.query("UPDATE users SET is_premium=false,is_pro=false WHERE id=$1",[row.user_id]);
       const prenom=esc(row.first_name||row.username||'client');
       await bot.sendMessage(row.telegram_id,
-        `⏰ *Abonnement expiré*\n\nBonjour *${prenom}*,\n\nVotre abonnement a expiré le ${fmtDate(row.subscription_expires_at)}.\nVous avez été retiré du canal *${esc(channel.channel_name||'')}*.\n\n💳 *Renouveler votre abonnement :*\nhttps://a42ddbbc-f934-4f10-af76-20388838fe9b-00-rifgo0fh7zj9.worf.replit.dev/payment.html\n\nTapez /start pour gérer votre compte.`,
-        {parse_mode:'Markdown'}).catch(()=>{});
+        `⏰ *Abonnement expiré*\n\nBonjour *${prenom}*,\n\nVotre abonnement a expiré le ${fmtDate(row.subscription_expires_at)}.\nVous avez été retiré du canal *${esc(channel.channel_name||'')}*.\n\nRenouveler pour retrouver accès :`,
+        { parse_mode:'Markdown', reply_markup:{ inline_keyboard:[
+          [{ text:'💳 Renouveler mon abonnement', url:`${SITE_URL}/payment.html` }],
+          [{ text:'📊 Mon compte', callback_data:'mon_compte' }]
+        ]}}).catch(()=>{});
       kicked++;
       console.log(`[TG-KICK] ${row.username} (${row.telegram_id}) retiré`);
     } catch(e) { console.error('[TG-KICK-ERR]',row.username,e.message); }
@@ -1770,19 +2084,39 @@ bot.on('new_chat_members', async (msg) => {
     if (m.is_bot) continue;
     await trackVisitor(m.id,m.username,m.first_name);
     // Appliquer la durée par défaut du canal si définie
+    let provisionalGranted = false;
     if (channel.default_duration_days) {
       const exp=new Date(Date.now()+channel.default_duration_days*24*60*60*1000);
       const linked=await getLinkedUser(m.id);
       if (linked) {
-        await pool.query(
-          "UPDATE users SET subscription_expires_at=$1,is_premium=true WHERE id=$2 AND (subscription_expires_at IS NULL OR subscription_expires_at<NOW())",
+        const upd = await pool.query(
+          "UPDATE users SET subscription_expires_at=$1,is_premium=true WHERE id=$2 AND (subscription_expires_at IS NULL OR subscription_expires_at<NOW()) RETURNING id",
           [exp, linked.id]
-        ).catch(()=>{});
+        ).catch(()=>({rows:[]}));
+        if (upd.rows.length) {
+          provisionalGranted = true;
+          // Notifier le membre de son accès provisoire avec bouton de paiement
+          await bot.sendMessage(m.id,
+            `👋 Bienvenue *${esc(m.first_name||m.username||'!')}* !\n\n`+
+            `🎁 *Accès provisoire accordé* : *${channel.default_duration_days} jour(s)*\n`+
+            `• Expire le : *${fmtDate(exp)}*\n\n`+
+            `⚠️ Cet accès est temporaire. Pour continuer après expiration, finalisez votre paiement :`,
+            { parse_mode:'Markdown', reply_markup:{ inline_keyboard:[
+              [{ text:'💳 Payer maintenant', url:`${SITE_URL}/payment.html` }],
+              [{ text:'📊 Mon compte', callback_data:'mon_compte' }]
+            ]}}).catch(()=>{});
+        }
       }
     }
-    await bot.sendMessage(m.id,
-      `👋 Bienvenue sur *Sossou Kouamé Shopping Boutique* !\n\nConnectez-vous ou créez un compte pour gérer votre abonnement.\n\nTapez /start`,
-      {parse_mode:'Markdown'}).catch(()=>{});
+    if (!provisionalGranted) {
+      await bot.sendMessage(m.id,
+        `👋 Bienvenue sur *Sossou Kouamé Shopping Boutique* !\n\nConnectez-vous ou créez un compte pour gérer votre abonnement.`,
+        { parse_mode:'Markdown', reply_markup:{ inline_keyboard:[
+          [{ text:'🔐 Se connecter', callback_data:'action_connexion' }],
+          [{ text:"📝 S'inscrire", callback_data:'action_inscription' }],
+          [{ text:'💳 Accéder au site', url: SITE_URL }]
+        ]}}).catch(()=>{});
+    }
   }
 });
 
@@ -1887,6 +2221,9 @@ bot.on('callback_query', async (query) => {
   const chatId=query.message.chat.id;
   const data=query.data;
   await bot.answerCallbackQuery(query.id).catch(()=>{});
+
+  // ── Bouton section-titre (sans action) ──
+  if (data==='noop') return;
 
   // ── ADMIN ──
   if (chatId===ADMIN_TG_ID) {
@@ -2125,6 +2462,20 @@ bot.on('callback_query', async (query) => {
         SEND_OPT({inline_keyboard:[[{text:'❌ Annuler',callback_data:'cancel'}]]})
       ); return;
     }
+
+    // ── Lien d'inscription (admin configure l'URL du site d'inscription) ──
+    if (data==='admin_inscription_link') {
+      const cur = await pool.query("SELECT value FROM settings WHERE key='inscription_url'").catch(()=>({rows:[]}));
+      const curUrl = cur.rows[0]?.value || 'Non défini';
+      tgSessions.set(chatId,{ step:'set_inscription_link' });
+      await bot.sendMessage(chatId,
+        `🌐 *Lien d'inscription du site*\n━━━━━━━━━━━━━━━━━━━━━━\n`+
+        `Actuel : ${curUrl}\n\n`+
+        `Entrez le nouveau lien d'inscription (URL complète) :\n`+
+        `_Ex: https://sossou-kouame-paiement.onrender.com/#register_`,
+        SEND_OPT({inline_keyboard:[[{text:'❌ Annuler',callback_data:'cancel'}]]})
+      ); return;
+    }
   }
 
   // ── Confirmation inscription ──
@@ -2156,7 +2507,8 @@ bot.on('callback_query', async (query) => {
   }
   if (data==='deconnexion') {
     await unlinkTgUser(chatId);
-    bot.sendMessage(chatId,'✅ Déconnecté.\n\nTapez /start pour vous reconnecter.',SEND_OPT(KB_GUEST_MENU)); return;
+    const afterKb = chatId===ADMIN_TG_ID ? KB_ADMIN_MENU : KB_GUEST_MENU;
+    bot.sendMessage(chatId,'✅ Déconnecté.\n\nTapez /start pour vous reconnecter.',SEND_OPT(afterKb)); return;
   }
   if (data==='action_connexion') {
     tgSessions.set(chatId,{step:'login_username'});
@@ -2266,6 +2618,23 @@ bot.on('message', async (msg) => {
       `• Expire le : *${fmtDate(newExpiry)}*\n`+
       `• Temps restant : *${remStr}*\n\n`+
       `Un lien d'invitation a été envoyé au membre.`,
+      SEND_OPT(KB_ADMIN_MENU)
+    ); return;
+  }
+
+  // ── Lien d'inscription (admin) ────────────────────────────────────────────
+  if (chatId===ADMIN_TG_ID && sess.step==='set_inscription_link') {
+    tgSessions.delete(chatId);
+    if (!text.startsWith('http')) {
+      bot.sendMessage(chatId,'⚠️ URL invalide. Elle doit commencer par https://',SEND_OPT(KB_ADMIN_MENU)); return;
+    }
+    await pool.query(
+      `INSERT INTO settings(key,value) VALUES('inscription_url',$1)
+       ON CONFLICT(key) DO UPDATE SET value=$1, updated_at=NOW()`,
+      [text.trim()]
+    ).catch(e=>console.error('[INSC-URL]',e.message));
+    await bot.sendMessage(chatId,
+      `✅ *Lien d'inscription mis à jour !*\n\n🌐 ${text.trim()}\n\nCe lien sera affiché aux utilisateurs qui souhaitent s'inscrire.`,
       SEND_OPT(KB_ADMIN_MENU)
     ); return;
   }

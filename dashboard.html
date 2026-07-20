@@ -493,6 +493,14 @@
       document.getElementById('mfFrame').src='about:blank';
     }
 
+    // Rediriger l'admin vers son espace dédié
+    async function load(){
+      const r=await fetch('/api/me');
+      if(!r.ok){ window.location.href='/'; return; }
+      const u=await r.json();
+      if(u.is_admin){ window.location.href='/admin.html'; return; }
+      initDash(u);
+    }
     load();
     loadShop();
   </script>

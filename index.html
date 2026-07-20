@@ -211,6 +211,26 @@
           <div class="panel-arrow">›</div>
         </div>
       </button>
+
+      <button class="panel-btn" onclick="goto('register')" style="margin-top:4px">
+        <div class="panel-inner" style="background:linear-gradient(135deg,rgba(16,185,129,.15),rgba(99,102,241,.1));border:1.5px solid rgba(16,185,129,.35)">
+          <div class="panel-icon">📝</div>
+          <div class="panel-text">
+            <h2 style="color:#6EE7B7">Créer un compte</h2>
+            <p>Inscription gratuite — accédez à tous les services.</p>
+          </div>
+          <div class="panel-arrow">›</div>
+        </div>
+      </button>
+    </div>
+
+    <!-- Bouton déconnexion visible si déjà connecté -->
+    <div id="alreadyLoggedIn" style="display:none;margin-top:20px;text-align:center">
+      <p style="color:rgba(255,255,255,.5);font-size:.82rem;margin:0 0 10px">Vous êtes déjà connecté(e)</p>
+      <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
+        <a href="/dashboard.html" style="background:rgba(240,192,64,.15);border:1px solid rgba(240,192,64,.4);color:#F0C040;padding:9px 20px;border-radius:10px;font-size:.85rem;font-weight:700;text-decoration:none">📊 Mon espace</a>
+        <button onclick="doLogout()" style="background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.3);color:#FCA5A5;padding:9px 20px;border-radius:10px;font-size:.85rem;font-weight:700;cursor:pointer">🚪 Se déconnecter</button>
+      </div>
     </div>
 
     <p class="footer-note">© 2026 Sossou Kouamé Shopping Boutique — Tous droits réservés</p>
@@ -237,6 +257,74 @@
 
   <!-- ══════════════════════════════════════════
        PAGE 2 — CONNEXION
+  ══════════════════════════════════════════ -->
+  <div class="page" id="pg-register">
+    <div class="page-brand">
+      <div class="page-brand-logo">
+        <img src="logo-sk.png" alt="Logo" onerror="this.closest('.page-brand-logo').style.display='none'">
+      </div>
+      <h1 style="color:#6EE7B7">📝 Créer un compte</h1>
+      <p>Inscription gratuite pour accéder à vos abonnements et à la boutique</p>
+    </div>
+
+    <div class="login-card">
+      <form id="registerForm" onsubmit="handleRegister(event)">
+        <div class="login-form-inner">
+          <div class="form-group">
+            <label class="form-label-sm" for="regUsername">Identifiant</label>
+            <div class="input-wrapper">
+              <svg class="input-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+              </svg>
+              <input type="text" id="regUsername" placeholder="Sans espaces (ex: jean2024)" autocomplete="username" required>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label-sm" for="regEmail">Adresse email</label>
+            <div class="input-wrapper">
+              <svg class="input-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>
+              </svg>
+              <input type="email" id="regEmail" placeholder="votre@email.com" autocomplete="email" required>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label-sm" for="regPassword">Mot de passe</label>
+            <div class="input-wrapper">
+              <svg class="input-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+              </svg>
+              <input type="password" id="regPassword" placeholder="Min. 6 caractères" autocomplete="new-password" required>
+            </div>
+          </div>
+
+          <div id="regErr" class="login-error hidden">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+            </svg>
+            <span id="regErrText"></span>
+          </div>
+
+          <button type="submit" class="btn-login" id="regBtn" style="background:linear-gradient(135deg,#10B981,#059669)">
+            <span id="regBtnTxt">Créer mon compte</span>
+            <span class="btn-loader hidden" id="regLoad"></span>
+          </button>
+
+          <p style="text-align:center;font-size:.8rem;color:rgba(255,255,255,.4);margin:12px 0 0">
+            Déjà un compte ?
+            <button type="button" onclick="goto('login')" style="background:none;border:none;color:#a5b4fc;cursor:pointer;font-size:.8rem;font-family:inherit;text-decoration:underline">Se connecter</button>
+          </p>
+        </div>
+      </form>
+    </div>
+
+    <p class="footer-note" style="margin-top:24px">Appuyez sur ← Retour pour revenir à l'accueil</p>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       PAGE 2b — CONNEXION
   ══════════════════════════════════════════ -->
   <div class="page" id="pg-login">
     <div class="page-brand">
@@ -287,6 +375,11 @@
             <span id="loginBtnTxt">Se connecter</span>
             <span class="btn-loader hidden" id="loginLoad"></span>
           </button>
+
+          <p style="text-align:center;font-size:.8rem;color:rgba(255,255,255,.4);margin:12px 0 0">
+            Pas encore de compte ?
+            <button type="button" onclick="goto('register')" style="background:none;border:none;color:#6EE7B7;cursor:pointer;font-size:.8rem;font-family:inherit;text-decoration:underline">S'inscrire gratuitement</button>
+          </p>
         </div>
       </form>
     </div>
@@ -378,10 +471,15 @@
     })();
 
     // ── Auth check ──
-    fetch('/api/me').then(r=>{ if(r.ok) window.location.href='/dashboard.html'; }).catch(()=>{});
+    fetch('/api/me').then(r=>{
+      if(r.ok){
+        // Déjà connecté : afficher les options sur la home au lieu de rediriger
+        document.getElementById('alreadyLoggedIn').style.display = '';
+      }
+    }).catch(()=>{});
 
     // ── ROUTEUR (History API) ──
-    const PAGES = { home:'pg-home', don:'pg-don', login:'pg-login' };
+    const PAGES = { home:'pg-home', don:'pg-don', login:'pg-login', register:'pg-register' };
     let current = 'home';
 
     function showPage(name) {
@@ -644,7 +742,9 @@
         const d=await r.json();
         if(r.ok&&d.success){
           txt.textContent='✓ Bienvenue !';
-          setTimeout(()=>window.location.href='/dashboard.html',400);
+          const meRes=await fetch('/api/me');
+          const me=meRes.ok?await meRes.json():{};
+          setTimeout(()=>window.location.href=me.is_admin?'/admin.html':'/dashboard.html',400);
         } else {
           etx.textContent=d.error||'Identifiant ou mot de passe incorrect';
           err.classList.remove('hidden');
@@ -657,6 +757,46 @@
       }
     }
     function togglePwd(){ const i=document.getElementById('password'); i.type=i.type==='password'?'text':'password'; }
+
+    // ── INSCRIPTION ──
+    async function handleRegister(e){
+      e.preventDefault();
+      const btn=document.getElementById('regBtn'), txt=document.getElementById('regBtnTxt');
+      const ld=document.getElementById('regLoad'), err=document.getElementById('regErr');
+      const etx=document.getElementById('regErrText');
+      btn.disabled=true; txt.textContent='Création…'; ld.classList.remove('hidden'); err.classList.add('hidden');
+      try{
+        const r=await fetch('/api/register',{
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({
+            username: document.getElementById('regUsername').value.trim(),
+            email:    document.getElementById('regEmail').value.trim(),
+            password: document.getElementById('regPassword').value
+          })
+        });
+        const d=await r.json();
+        if(r.ok && d.success){
+          txt.textContent='✓ Compte créé !';
+          // Les nouveaux inscrits ne sont jamais admin
+          setTimeout(()=>window.location.href='/dashboard.html', 500);
+        } else {
+          etx.textContent = d.error || 'Erreur lors de l\'inscription';
+          err.classList.remove('hidden');
+          btn.disabled=false; txt.textContent='Créer mon compte'; ld.classList.add('hidden');
+        }
+      }catch{
+        etx.textContent='Erreur réseau. Vérifiez votre connexion.';
+        err.classList.remove('hidden');
+        btn.disabled=false; txt.textContent='Créer mon compte'; ld.classList.add('hidden');
+      }
+    }
+
+    // ── DÉCONNEXION ──
+    async function doLogout(){
+      try{ await fetch('/api/logout',{method:'POST'}); }catch(_){}
+      document.getElementById('alreadyLoggedIn').style.display='none';
+      window.location.reload();
+    }
 
     // ── OVERLAY MONEY FUSION ──
     let _mfPollIv=null;
