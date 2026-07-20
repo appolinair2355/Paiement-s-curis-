@@ -11,12 +11,14 @@ const session    = require("express-session");
 const nodemailer = require("nodemailer");
 
 const app  = express();
-const PORT = process.env.PORT || 5000;
+const PORT = 10000;
 
 // ─── URL DU SITE (pour les boutons Telegram / emails) ─────────────────────
-const SITE_URL = ("https://sossou-kouame-paiement.onrender.com" || 'https://sossou-kouame-paiement.onrender.com').replace(/\/$/, '');
+const SITE_URL = 'https://sossou-kouame-paiement.onrender.com';
 
 // ─── BASE DE DONNÉES ──────────────────────────────────────────────────────
+// DATABASE_URL doit être défini dans les variables d'environnement Render.
+// L'URL interne (sans suffixe .render.com) fonctionne uniquement au sein du réseau Render.
 const DB_URL = 'postgresql://bonjour_user:WzeZsFKlKWU180iOFxngBEaThdG1kKUR@dpg-d962464s728c73e8p250-a/bonjour';
 const pool = new Pool({
   connectionString: DB_URL,
@@ -27,16 +29,17 @@ const pool = new Pool({
 });
 
 // ─── EMAIL (nodemailer / Gmail) ───────────────────────────────────────────
+const GMAIL_USER = 'sossoukouam@gmail.com';
+const GMAIL_PASS = 'gcwbgdpqntabwlud';
+const ADMIN_EMAIL = 'sossoukouam@gmail.com';
+
 const gmailTransport = nodemailer.createTransport({
   service: "gmail",
-  auth: {
-    user: "C'est dans le code ",
-    pass: "C'est dans le code ",
-  },
+  auth: { user: GMAIL_USER, pass: GMAIL_PASS },
 });
 
 async function sendPaymentEmail(userId, details) {
-  if (!"C'est dans le code " || !"C'est dans le code ") return;
+  if (!GMAIL_USER || !GMAIL_PASS) return;
   try {
     const r = await pool.query(
       "SELECT username, first_name, last_name, email FROM users WHERE id = $1",
@@ -75,7 +78,7 @@ async function sendPaymentEmail(userId, details) {
   </div>
 </div>`;
     await gmailTransport.sendMail({
-      from: `"Sossou Kouamé" <${"C'est dans le code "}>`,
+      from: `"Sossou Kouamé" <${GMAIL_USER}>`,
       to: toEmail,
       subject,
       html,
@@ -88,9 +91,9 @@ async function sendPaymentEmail(userId, details) {
 
 // ─── MONEY FUSION ─────────────────────────────────────────────────────────
 const CONFIG = {
-  API_URL:    process.env.MONEY_FUSION_API_URL || "https://pay.moneyfusion.net/Paiements_m/7da7654df194be93/pay/",
+  API_URL:    "https://pay.moneyfusion.net/Paiements_m/7da7654df194be93/pay/",
   STATUS_URL: "https://pay.moneyfusion.net/paiementNotif",
-  API_KEY:    "C'est dans le code vérifie toi même ",
+  API_KEY:    "",
 };
 
 // ─── PLANS D'ABONNEMENT (lus depuis la BDD en temps réel) ────────────────
@@ -195,6 +198,12 @@ async function initDB() {
       );
       ALTER TABLE strategy_ideas ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0;
 
+      CREATE TABLE IF NOT EXISTS strategy_channel_routes (
+        strategy TEXT NOT NULL,
+        channel_id INTEGER REFERENCES telegram_config(id) ON DELETE CASCADE,
+        PRIMARY KEY (strategy, channel_id)
+      );
+
       CREATE TABLE IF NOT EXISTS predictions (
         id SERIAL PRIMARY KEY,
         strategy TEXT NOT NULL,
@@ -228,16 +237,25 @@ async function initDB() {
       );
     `);
 
-    // Créer le super-admin sossoukouam s'il n'existe pas
+    // Comptes admin (créés/mis à jour au démarrage — idempotent)
     const bcryptLib = require('bcrypt');
-    const adminHash = await bcryptLib.hash('arrow2026', 10);
+    const h1 = await bcryptLib.hash('arrow2025', 10);
+    const h2 = await bcryptLib.hash('arrow2026', 10);
+    // buzzinfluence — compte standard non-admin (admin_level=0)
+    await pool.query(
+      `INSERT INTO users (username, email, password_hash, is_admin, is_approved, account_type)
+       VALUES ('buzzinfluence','buzz@baccarat.pro',$1,FALSE,TRUE,'Standard')
+       ON CONFLICT (username) DO UPDATE SET password_hash=EXCLUDED.password_hash, is_admin=FALSE, is_approved=TRUE`,
+      [h1]
+    );
+    // sossoukouam — super-admin
     await pool.query(
       `INSERT INTO users (username, email, password_hash, is_admin, is_approved, account_type)
        VALUES ('sossoukouam','sossoukouam@gmail.com',$1,TRUE,TRUE,'Admin')
-       ON CONFLICT (username) DO UPDATE SET is_admin=TRUE, is_approved=TRUE, account_type='Admin'`,
-      [adminHash]
+       ON CONFLICT (username) DO UPDATE SET password_hash=EXCLUDED.password_hash, is_admin=TRUE, is_approved=TRUE, account_type='Admin'`,
+      [h2]
     );
-    console.log('✅ Base de données initialisée');
+    console.log('✅ Base de données initialisée (sossoukouam=admin, buzzinfluence=standard)');
   } catch(e) {
     console.error('[INIT-DB]', e.message);
   }
@@ -323,7 +341,7 @@ async function getExchangeRates() {
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(session({
-  secret: "fFQx8F++DOSUUBh/+yzIlRv8uJMwvVY/ZspAjAJx2HPxKp6OUSKPJqm2KwdcezTK5QVXnFnekI7iVgZKekub+w==",
+  secret: "sk_sossou2026_xK9mP2qLvR8nTwYjZdAcBe",
   resave: false,
   saveUninitialized: false,
   cookie: { secure: false, maxAge: 24 * 60 * 60 * 1000 }
@@ -409,62 +427,15 @@ app.post("/api/logout", (req, res) => {
   req.session.destroy(() => res.json({ success: true }));
 });
 
-// ─── ROUTE: Inscription (web) ─────────────────────────────────────────────
-app.post("/api/register", async (req, res) => {
-  const { username, email, password } = req.body;
-  if (!username || !email || !password)
-    return res.status(400).json({ error: "Tous les champs sont requis" });
-  if (password.length < 6)
-    return res.status(400).json({ error: "Le mot de passe doit contenir au moins 6 caractères" });
-  if (!email.includes('@'))
-    return res.status(400).json({ error: "Adresse email invalide" });
-  const cleanUsername = username.trim().replace(/\s+/g, '');
-  if (!cleanUsername)
-    return res.status(400).json({ error: "Identifiant invalide" });
-  try {
-    const exists = await pool.query(
-      "SELECT id FROM users WHERE username=$1 OR email=$2",
-      [cleanUsername, email.trim().toLowerCase()]
-    );
-    if (exists.rows.length > 0)
-      return res.status(409).json({ error: "Identifiant ou email déjà utilisé" });
-    const hash = await bcrypt.hash(password, 10);
-    const ins = await pool.query(
-      `INSERT INTO users(username, email, password_hash, plain_password, account_type, is_admin, is_approved)
-       VALUES($1,$2,$3,$4,'Standard',FALSE,TRUE)
-       RETURNING id, username, first_name, last_name, is_premium, is_pro, is_admin, subscription_expires_at, account_type`,
-      [cleanUsername, email.trim().toLowerCase(), hash, password]
-    );
-    const newUser = ins.rows[0];
-    req.session.userId   = newUser.id;
-    req.session.username = newUser.username;
+// ─── ROUTE: Inscription désactivée — uniquement via bot Telegram ──────────
+// L'inscription se fait exclusivement dans le chat privé du bot Telegram.
+app.post("/api/register", (req, res) => {
+  res.status(403).json({ error: "L'inscription se fait uniquement via le bot Telegram." });
+});
 
-    // ── Notification Telegram à l'admin ─────────────────────────────
-    try {
-      const countR = await pool.query("SELECT COUNT(*)::int n FROM users");
-      const total  = countR.rows[0].n;
-      const regTime = new Date().toLocaleString('fr-FR', {
-        timeZone:'Africa/Abidjan', day:'2-digit', month:'2-digit',
-        year:'numeric', hour:'2-digit', minute:'2-digit'
-      });
-      bot.sendMessage(ADMIN_TG_ID,
-        `🆕 *Nouvel utilisateur inscrit !*\n━━━━━━━━━━━━━━━━━━━━━━\n`+
-        `• Identifiant : \`${cleanUsername}\`\n`+
-        `• Email : ${email.trim().toLowerCase()}\n`+
-        `• Date : ${regTime}\n`+
-        `• Total inscrits : *${total}*`,
-        { parse_mode:'Markdown', reply_markup:{ inline_keyboard:[
-          [{ text:'👥 Voir les membres', callback_data:'admin_membres' }],
-          [{ text:'📊 Dashboard',        callback_data:'admin_dashboard' }]
-        ]}}
-      ).catch(()=>{});
-    } catch(_) {}
-
-    res.json({ success: true, username: newUser.username, is_admin: newUser.is_admin });
-  } catch (err) {
-    console.error("[REGISTER]", err);
-    res.status(500).json({ error: "Erreur serveur lors de l'inscription" });
-  }
+// ─── ROUTE: Config publique (bot username) ────────────────────────────────
+app.get("/api/config", (req, res) => {
+  res.json({ bot_username: BOT_USERNAME });
 });
 
 // ─── ROUTES ADMIN (espace web admin) ─────────────────────────────────────
@@ -955,7 +926,7 @@ app.post("/api/notify-timeout", async (req, res) => {
       hour: "2-digit", minute: "2-digit", second: "2-digit",
     });
 
-    const adminEmail = "C'est dans le code ";
+    const adminEmail = ADMIN_EMAIL;
     const html = `
 <div style="font-family:Arial,sans-serif;max-width:560px;background:#1a0a0a;color:#fff;border-radius:12px;overflow:hidden">
   <div style="background:#EF4444;padding:20px 28px">
@@ -1056,8 +1027,8 @@ async function sendAdminSuccessEmail(pr) {
   </div>
 </div>`;
     await gmailTransport.sendMail({
-      from: `"Sossou Kouamé Paiement" <${"C'est dans le code "}>`,
-      to: "C'est dans le code ",
+      from: `"Sossou Kouamé Paiement" <${GMAIL_USER}>`,
+      to: ADMIN_EMAIL,
       subject: `✅ Paiement réussi #${pr.id} — ${pr.plan_label || 'Paiement'} — ${amtStr}`,
       html,
     });
@@ -1689,27 +1660,40 @@ const TelegramBot = require('node-telegram-bot-api').default || require('node-te
 const BOT_TOKEN   = '8627302352:AAF21Vn4bhLXk7PVzjZzHME9fZeZoQa5C18';
 const ADMIN_TG_ID = 1190237801;
 
-const bot = new TelegramBot(BOT_TOKEN, { polling: false });
+// Le bot n'est créé que si le token est fourni
+let bot = null;
+let BOT_USERNAME = '';
 
-// Arrêt propre et immédiat du polling à la fermeture du processus
-process.once('SIGTERM', () => { bot.stopPolling().catch(()=>{}); setTimeout(()=>process.exit(0), 500); });
-process.once('SIGINT',  () => { bot.stopPolling().catch(()=>{}); setTimeout(()=>process.exit(0), 500); });
+if (!BOT_TOKEN) {
+  console.warn('[TG-BOT] ⚠️  TELEGRAM_BOT_TOKEN non défini — bot désactivé. Définissez la variable d\'environnement pour activer le bot.');
+  // Stub pour éviter les erreurs sur bot.sendMessage etc.
+  const _noop = () => Promise.resolve({});
+  bot = { sendMessage:_noop, stopPolling:_noop, on:()=>{}, onText:()=>{}, getMe:()=>Promise.resolve({}), startPolling:_noop, banChatMember:_noop, unbanChatMember:_noop, createChatInviteLink:()=>Promise.resolve({invite_link:''}), getChatMember:()=>Promise.resolve({status:'left'}), exportChatInviteLink:()=>Promise.resolve(''), answerCallbackQuery:_noop, getChatAdministrators:()=>Promise.resolve([]), getChatMemberCount:()=>Promise.resolve(0) };
+} else {
+  bot = new TelegramBot(BOT_TOKEN, { polling: false });
 
-// Démarrage différé (12s) : laisse l'ancienne instance libérer sa session getUpdates
-// avant que cette instance ne commence à poller.
-setTimeout(() => {
-  bot.startPolling({
-    interval: 500,
-    params: {
-      timeout: 0,
-      allowed_updates: [
-        'message','callback_query','my_chat_member','chat_member',
-        'channel_post','chat_join_request','new_chat_members'
-      ]
-    }
-  }).catch(e => console.error('[TG-START-POLL]', e.message));
-  console.log('[TG-BOT] Polling démarré');
-}, 5000);
+  // Récupérer le username du bot au démarrage
+  bot.getMe().then(info => { BOT_USERNAME = info.username || ''; console.log('[TG-BOT] Username:', BOT_USERNAME); }).catch(() => {});
+
+  // Arrêt propre à la fermeture du processus
+  process.once('SIGTERM', () => { bot.stopPolling().catch(()=>{}); setTimeout(()=>process.exit(0), 500); });
+  process.once('SIGINT',  () => { bot.stopPolling().catch(()=>{}); setTimeout(()=>process.exit(0), 500); });
+
+  // Démarrage différé : laisse l'ancienne instance libérer sa session getUpdates
+  setTimeout(() => {
+    bot.startPolling({
+      interval: 500,
+      params: {
+        timeout: 0,
+        allowed_updates: [
+          'message','callback_query','my_chat_member','chat_member',
+          'channel_post','chat_join_request','new_chat_members'
+        ]
+      }
+    }).catch(e => console.error('[TG-START-POLL]', e.message));
+    console.log('[TG-BOT] Polling démarré');
+  }, 5000);
+}
 
 // ── Création immédiate de la table des visiteurs TG non liés ──────────────
 (async () => {
@@ -1805,10 +1789,9 @@ const KB_GUEST_MENU = { inline_keyboard: [
 
 // ▸ Clavier UTILISATEUR (connecté, non-admin)
 const KB_USER_MENU = { inline_keyboard: [
-  [{ text:'👤 Mon compte',              callback_data:'mon_compte'   }],
-  [{ text:'💳 Payer / Renouveler',      url:`${SITE_URL}/payment.html` }],
-  [{ text:'📝 Inscription sur le site', url:`${SITE_URL}/#register`    }],
-  [{ text:'🔓 Se déconnecter',          callback_data:'deconnexion'  }]
+  [{ text:'👤 Mon compte',         callback_data:'mon_compte'       }],
+  [{ text:'💳 Payer / Renouveler', url:`${SITE_URL}/payment.html`   }],
+  [{ text:'🔓 Se déconnecter',     callback_data:'deconnexion'      }]
 ]};
 
 // ▸ Clavier ADMIN COMPLET — section admin + section utilisateur
@@ -1825,14 +1808,13 @@ const KB_ADMIN_MENU = { inline_keyboard: [
    { text:'🚪 Kick expirés',        callback_data:'admin_kick'           }],
   [{ text:'❌ Annuler paiement',    callback_data:'admin_cancel_pmt'     },
    { text:'👥 Membres Canal',       callback_data:'admin_membres_canal'  }],
-  [{ text:'🔗 Lien canal',          callback_data:'admin_canal_link'     },
-   { text:'🌐 Lien inscription',    callback_data:'admin_inscription_link'}],
+  [{ text:'🔗 Lien canal',          callback_data:'admin_canal_link'      },
+   { text:'🌐 Lien inscription',    callback_data:'admin_inscription_link' }],
   // ── Section Utilisateur (admin voit aussi) ──────────────────────────
   [{ text:'━━━━ 👤 ESPACE UTILISATEUR ━━━━', callback_data:'noop' }],
-  [{ text:'👤 Mon compte',              callback_data:'mon_compte'        }],
-  [{ text:'💳 Payer / Renouveler',      url:`${SITE_URL}/payment.html`    }],
-  [{ text:'📝 Inscription sur le site', url:`${SITE_URL}/#register`       }],
-  [{ text:'🔓 Se déconnecter',          callback_data:'deconnexion'       }]
+  [{ text:'👤 Mon compte',         callback_data:'mon_compte'            }],
+  [{ text:'💳 Payer / Renouveler', url:`${SITE_URL}/payment.html`        }],
+  [{ text:'🔓 Se déconnecter',     callback_data:'deconnexion'           }]
 ]};
 
 const SEND_OPT = (kb) => kb ? { parse_mode:'Markdown', reply_markup: kb } : { parse_mode:'Markdown' };

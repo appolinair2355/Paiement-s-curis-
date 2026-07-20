@@ -31,7 +31,13 @@ The server starts on port 5000. The workflow **Start application** (`npm start`)
 
 | Key | Purpose |
 |-----|---------|
-| `MONEY_FUSION_API_KEY` | Money Fusion API key (set as a Replit Secret) |
+| `DATABASE_URL` | PostgreSQL connection string (e.g. `postgresql://user:pass@host/db`) |
+| `SESSION_SECRET` | Secret used to sign session cookies |
+| `MONEY_FUSION_API_KEY` | Money Fusion API key |
+| `TELEGRAM_BOT_TOKEN` | Telegram bot token for notifications |
+| `GMAIL_USER` | Gmail address used to send confirmation emails |
+| `GMAIL_PASS` | Gmail app password for the above account |
+| `ADMIN_EMAIL` | Email address that receives admin/failure alerts |
 
 ## API routes
 
