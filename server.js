@@ -17,8 +17,6 @@ const PORT = 10000;
 const SITE_URL = 'https://sossou-kouame-paiement.onrender.com';
 
 // ─── BASE DE DONNÉES ──────────────────────────────────────────────────────
-// URL externe Render (avec suffixe .render.com) — fonctionne partout, y compris
-// hors du réseau interne Render (Replit, local, autre région).
 const DB_URL = 'postgresql://bonjour_user:WzeZsFKlKWU180iOFxngBEaThdG1kKUR@dpg-d962464s728c73e8p250-a.oregon-postgres.render.com/bonjour';
 const pool = new Pool({
   connectionString: DB_URL,
@@ -29,8 +27,8 @@ const pool = new Pool({
 });
 
 // ─── EMAIL (nodemailer / Gmail) ───────────────────────────────────────────
-const GMAIL_USER = 'sossoukouam@gmail.com';
-const GMAIL_PASS = 'gcwbgdpqntabwlud';
+const GMAIL_USER  = 'sossoukouam@gmail.com';
+const GMAIL_PASS  = 'gcwbgdpqntabwlud';
 const ADMIN_EMAIL = 'sossoukouam@gmail.com';
 
 const gmailTransport = nodemailer.createTransport({
@@ -159,6 +157,7 @@ async function initDB() {
       );
       ALTER TABLE payment_requests ADD COLUMN IF NOT EXISTS payment_method TEXT DEFAULT 'mobile_money';
       ALTER TABLE payment_requests ADD COLUMN IF NOT EXISTS transaction_id TEXT;
+      ALTER TABLE payment_requests ADD COLUMN IF NOT EXISTS phone_number TEXT;
 
       CREATE TABLE IF NOT EXISTS telegram_config (
         id SERIAL PRIMARY KEY,
@@ -235,6 +234,17 @@ async function initDB() {
         status TEXT DEFAULT 'awaiting_screenshot',
         created_at TIMESTAMPTZ DEFAULT NOW()
       );
+
+      -- Accès temporaire canal pour membres non encore liés
+      CREATE TABLE IF NOT EXISTS channel_temp_access (
+        telegram_id BIGINT PRIMARY KEY,
+        channel_id TEXT NOT NULL,
+        tg_username TEXT,
+        tg_first_name TEXT,
+        granted_at TIMESTAMPTZ DEFAULT NOW(),
+        expires_at TIMESTAMPTZ NOT NULL,
+        kicked BOOLEAN DEFAULT FALSE
+      );
     `);
 
     // Comptes admin (créés/mis à jour au démarrage — idempotent)
@@ -260,8 +270,7 @@ async function initDB() {
     console.error('[INIT-DB]', e.message);
   }
 }
-// Appel au démarrage
-initDB().catch(e => console.error('[INIT-DB-FATAL]', e.message));
+// initDB() est appelé dans app.listen pour garantir l'ordre correct.
 
 async function getPlans() {
   try {
@@ -341,7 +350,7 @@ async function getExchangeRates() {
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(session({
-  secret: "sk_sossou2026_xK9mP2qLvR8nTwYjZdAcBe",
+  secret: 'sk_sossou2026_xK9mP2qLvR8nTwYjZdAcBe',
   resave: false,
   saveUninitialized: false,
   cookie: { secure: false, maxAge: 24 * 60 * 60 * 1000 }
@@ -1894,6 +1903,11 @@ async function getLinkedUser(telegramId) {
 async function unlinkTgUser(telegramId) {
   await pool.query("UPDATE users SET telegram_id=NULL WHERE telegram_id=$1", [String(telegramId)]).catch(()=>{});
 }
+// Vérifie si le Telegram ID est lié à un compte admin en BDD
+async function isAdminUser(chatId) {
+  const linked = await getLinkedUser(chatId);
+  return linked?.is_admin === true;
+}
 async function trackVisitor(telegramId, tgUsername, tgFirstName) {
   await pool.query(`
     INSERT INTO telegram_visitors(telegram_id,tg_username,tg_first_name,seen_at)
@@ -1956,8 +1970,8 @@ const KB_ADMIN_MENU = { inline_keyboard: [
    { text:'🚪 Kick expirés',        callback_data:'admin_kick'           }],
   [{ text:'❌ Annuler paiement',    callback_data:'admin_cancel_pmt'     },
    { text:'👥 Membres Canal',       callback_data:'admin_membres_canal'  }],
-  [{ text:'🔗 Lien canal',          callback_data:'admin_canal_link'      },
-   { text:'🌐 Lien inscription',    callback_data:'admin_inscription_link' }],
+  [{ text:'🔗 Lien canal',          callback_data:'admin_canal_link'     },
+   { text:'🔴 Membres expirés',    callback_data:'admin_expires'        }],
   // ── Section Utilisateur (admin voit aussi) ──────────────────────────
   [{ text:'━━━━ 👤 ESPACE UTILISATEUR ━━━━', callback_data:'noop' }],
   [{ text:'👤 Mon compte',         callback_data:'mon_compte'            }],
@@ -2054,7 +2068,7 @@ async function sendUserDashboard(chatId, user) {
     strats.rows.forEach(s=>{ msg+=`• ${esc(s.name)}\n`; });
   }
   // L'admin récupère son menu complet après "Mon compte"
-  const kb = chatId===ADMIN_TG_ID ? KB_ADMIN_MENU : KB_USER_MENU;
+  const kb = user.is_admin ? KB_ADMIN_MENU : KB_USER_MENU;
   await bot.sendMessage(chatId, msg, SEND_OPT(kb));
 }
 
@@ -2087,29 +2101,63 @@ async function sendMembersAdmin(chatId, page=0) {
 
 // ── Stratégies (admin) ─────────────────────────────────────────────────────
 async function sendStrategiesAdmin(chatId) {
-  const [ideas,routes,pred_c]=await Promise.all([
+  const [ideas,routes,pred_c,cfgRow]=await Promise.all([
     pool.query(`SELECT * FROM strategy_ideas ORDER BY sort_order,id`),
     pool.query(`SELECT scr.strategy,scr.channel_id,tc.channel_name
                 FROM strategy_channel_routes scr LEFT JOIN telegram_config tc ON tc.id=scr.channel_id`),
-    pool.query(`SELECT strategy,COUNT(*)::int n,COUNT(*) FILTER(WHERE status='won')::int won FROM predictions GROUP BY strategy`)
-  ]).catch(()=>([{rows:[]},{rows:[]},{rows:[]}]));
+    pool.query(`SELECT strategy,COUNT(*)::int n,COUNT(*) FILTER(WHERE status='won')::int won FROM predictions GROUP BY strategy`),
+    pool.query(`SELECT value FROM settings WHERE key='strategies_config'`).catch(()=>({rows:[]}))
+  ]).catch(()=>([{rows:[]},{rows:[]},{rows:[]},{rows:[]}]));
 
   const routeMap={};
   routes.rows.forEach(r=>{ (routeMap[r.strategy]=routeMap[r.strategy]||[]).push(r.channel_name||`#${r.channel_id}`); });
   const predMap={};
   pred_c.rows.forEach(r=>{ predMap[r.strategy]=r; });
 
-  let msg=`📋 *Stratégies* (${ideas.rows.length})\n━━━━━━━━━━━━━━━━━━━━━━\n`;
-  if (!ideas.rows.length) { msg+='_Aucune stratégie en BDD_'; }
-  else ideas.rows.forEach(s=>{
-    const p=predMap[s.id]||predMap[s.name]||{};
-    const ch=(routeMap[s.id]||routeMap[s.name]||[]).map(esc).join(', ')||'Non assignée';
-    msg+=`\n*${esc(s.name)}* (ID:${s.id})\n`;
-    msg+=`• ${s.enabled?'✅ Activée':'❌ Désactivée'} | ${s.is_paid?`💰 ${s.price_usd} USD`:'Gratuite'}\n`;
-    if (p.n) msg+=`• 🔮 Prédictions : ${p.n} (✅${p.won})\n`;
-    msg+=`• 📡 Canal : ${ch}\n`;
-  });
-  await bot.sendMessage(chatId,msg,SEND_OPT(null));
+  // Stratégies du fichier de configuration (importées)
+  let configStrats=[];
+  if (cfgRow.rows.length) {
+    try { configStrats=JSON.parse(cfgRow.rows[0].value)||[]; } catch {}
+  }
+
+  let msg='';
+
+  // ── Section 1 : stratégies de la config (bot + canaux) ───────────────────
+  if (configStrats.length) {
+    msg+=`🤖 *Stratégies configurées* (${configStrats.length})\n━━━━━━━━━━━━━━━━━━━━━━\n`;
+    configStrats.forEach(s=>{
+      const targets=(s.tg_targets||[]);
+      const hasToken=targets.some(t=>t.bot_token);
+      msg+=`\n*${esc(s.name||s.id)}* (mode: ${esc(s.mode||'—')})\n`;
+      msg+=`• ${s.enabled?'✅ Activée':'❌ Désactivée'}\n`;
+      msg+=`• 🔑 API Token : ${hasToken?'✅ Configuré':'⚠️ *Manquant* — à définir dans strategies-config.json'}\n`;
+      targets.forEach(t=>{
+        const maskedToken=t.bot_token?`${t.bot_token.split(':')[0]}:...${t.bot_token.slice(-6)}`:'*vide*';
+        msg+=`  📡 Canal : ${esc(t.channel_id||'—')} | Token : ${maskedToken}\n`;
+      });
+    });
+  }
+
+  // ── Section 2 : idées/stratégies boutique ────────────────────────────────
+  if (ideas.rows.length) {
+    msg+=`\n📋 *Stratégies boutique* (${ideas.rows.length})\n━━━━━━━━━━━━━━━━━━━━━━\n`;
+    ideas.rows.forEach(s=>{
+      const p=predMap[s.id]||predMap[s.name]||{};
+      const ch=(routeMap[s.id]||routeMap[s.name]||[]).map(esc).join(', ')||'Non assignée';
+      msg+=`\n*${esc(s.name)}* (ID:${s.id})\n`;
+      msg+=`• ${s.enabled?'✅ Activée':'❌ Désactivée'} | ${s.is_paid?`💰 ${s.price_usd} USD`:'Gratuite'}\n`;
+      if (p.n) msg+=`• 🔮 Prédictions : ${p.n} (✅${p.won})\n`;
+      msg+=`• 📡 Canal : ${ch}\n`;
+    });
+  }
+
+  if (!configStrats.length && !ideas.rows.length) {
+    msg=`📋 *Stratégies* (0)\n━━━━━━━━━━━━━━━━━━━━━━\n_Aucune stratégie configurée._\n\nAjoutez vos stratégies dans \`strategies-config.json\`.`;
+  }
+
+  // Limiter à 4096 caractères (limite Telegram)
+  if (msg.length>4000) msg=msg.substring(0,4000)+'…';
+  await bot.sendMessage(chatId,msg,SEND_OPT(KB_ADMIN_MENU));
 }
 
 // ── Canaux (admin) ─────────────────────────────────────────────────────────
@@ -2173,7 +2221,11 @@ async function scanCanalAdmin(chatId) {
 async function kickExpiredUsers(notifyAdmin=false) {
   const channel=await getActiveChannel();
   if (!channel) return;
-  const r=await pool.query(`
+  let kicked=0;
+  const kickedNames=[];
+
+  // ── 1. Membres liés (table users) ────────────────────────────────────────
+  const linked=await pool.query(`
     SELECT telegram_id::bigint,id AS user_id,username,first_name,subscription_expires_at
     FROM users
     WHERE telegram_id IS NOT NULL
@@ -2182,71 +2234,120 @@ async function kickExpiredUsers(notifyAdmin=false) {
       AND (is_premium=true OR is_pro=true)
   `).catch(()=>({rows:[]}));
 
-  let kicked=0;
-  for (const row of r.rows) {
+  for (const row of linked.rows) {
     try {
-      await bot.banChatMember(channel.channel_id,row.telegram_id);
-      await bot.unbanChatMember(channel.channel_id,row.telegram_id);
-      await pool.query("UPDATE users SET is_premium=false,is_pro=false WHERE id=$1",[row.user_id]);
+      await bot.banChatMember(channel.channel_id, row.telegram_id);
+      await bot.unbanChatMember(channel.channel_id, row.telegram_id);
+      await pool.query(
+        "UPDATE users SET is_premium=false,is_pro=false WHERE id=$1",
+        [row.user_id]
+      );
+      // Marquer comme kicked dans temp_access aussi (pour ne pas double-kick)
+      await pool.query(
+        "UPDATE channel_temp_access SET kicked=TRUE WHERE telegram_id=$1",
+        [row.telegram_id]
+      ).catch(()=>{});
       const prenom=esc(row.first_name||row.username||'client');
       await bot.sendMessage(row.telegram_id,
-        `⏰ *Abonnement expiré*\n\nBonjour *${prenom}*,\n\nVotre abonnement a expiré le ${fmtDate(row.subscription_expires_at)}.\nVous avez été retiré du canal *${esc(channel.channel_name||'')}*.\n\nRenouveler pour retrouver accès :`,
+        `⏰ *Abonnement expiré*\n\n`+
+        `Bonjour *${prenom}*,\n\n`+
+        `Votre accès gratuit au canal *${esc(channel.channel_name||'')}* a expiré.\n`+
+        `Vous avez été retiré automatiquement.\n\n`+
+        `💳 *Souscrivez pour retrouver l'accès :*`,
         { parse_mode:'Markdown', reply_markup:{ inline_keyboard:[
-          [{ text:'💳 Renouveler mon abonnement', url:`${SITE_URL}/payment.html` }],
-          [{ text:'📊 Mon compte', callback_data:'mon_compte' }]
+          [{ text:'💳 Payer maintenant',  url:`${SITE_URL}/payment.html`  }],
+          [{ text:'📊 Mon compte',        callback_data:'mon_compte'       }]
         ]}}).catch(()=>{});
       kicked++;
-      console.log(`[TG-KICK] ${row.username} (${row.telegram_id}) retiré`);
-    } catch(e) { console.error('[TG-KICK-ERR]',row.username,e.message); }
+      kickedNames.push(row.username||row.first_name||String(row.telegram_id));
+      console.log(`[TG-KICK] ${row.username||row.telegram_id} retiré (lié)`);
+    } catch(e) { console.error('[TG-KICK-ERR]', row.telegram_id, e.message); }
   }
-  if (notifyAdmin && kicked>0) {
-    bot.sendMessage(ADMIN_TG_ID,`🚪 *${kicked} membre(s) expiré(s) retirés du canal.*`,{parse_mode:'Markdown'}).catch(()=>{});
+
+  // ── 2. Membres non liés (table channel_temp_access) ──────────────────────
+  const temps=await pool.query(`
+    SELECT telegram_id,tg_username,tg_first_name
+    FROM channel_temp_access
+    WHERE channel_id=$1 AND expires_at<NOW() AND kicked=FALSE
+  `,[String(channel.channel_id)]).catch(()=>({rows:[]}));
+
+  for (const row of temps.rows) {
+    try {
+      await bot.banChatMember(channel.channel_id, row.telegram_id);
+      await bot.unbanChatMember(channel.channel_id, row.telegram_id);
+      await pool.query(
+        "UPDATE channel_temp_access SET kicked=TRUE WHERE telegram_id=$1",
+        [row.telegram_id]
+      );
+      const prenom=esc(row.tg_first_name||row.tg_username||'visiteur');
+      await bot.sendMessage(row.telegram_id,
+        `⏰ *Accès gratuit expiré*\n\n`+
+        `Bonjour *${prenom}*,\n\n`+
+        `Vos 5h gratuites dans *${esc(channel.channel_name||'')}* sont terminées.\n`+
+        `Créez un compte et souscrivez pour retrouver l'accès :`,
+        { parse_mode:'Markdown', reply_markup:{ inline_keyboard:[
+          [{ text:'💳 Souscrire',          url:`${SITE_URL}/payment.html`   }],
+          [{ text:"📝 Créer un compte",    callback_data:'action_inscription'}]
+        ]}}).catch(()=>{});
+      kicked++;
+      kickedNames.push(row.tg_username||row.tg_first_name||String(row.telegram_id));
+      console.log(`[TG-KICK] ${row.telegram_id} retiré (non lié)`);
+    } catch(e) { console.error('[TG-KICK-ERR]', row.telegram_id, e.message); }
+  }
+
+  if (notifyAdmin && kicked>0 && ADMIN_TG_ID) {
+    const names = kickedNames.slice(0,5).map(esc).join(', ')+(kickedNames.length>5?` +${kickedNames.length-5}`:'');
+    bot.sendMessage(ADMIN_TG_ID,
+      `🚪 *${kicked} membre(s) retiré(s) du canal*\n\n${names}`,
+      {parse_mode:'Markdown'}
+    ).catch(()=>{});
   }
 }
 // Vérification toutes les 5 minutes
 setInterval(()=>kickExpiredUsers(true), 5*60*1000);
 
-// ── Nouveaux membres dans le canal ─────────────────────────────────────────
+// ── Nouveaux membres dans le canal : 5h gratuites automatiques ────────────
+const FREE_HOURS_NEW_MEMBER = 5; // durée gratuite accordée à tout nouveau membre
+
 bot.on('new_chat_members', async (msg) => {
   const channel=await getActiveChannel();
   if (!channel||String(msg.chat.id)!==String(channel.channel_id)) return;
   for (const m of msg.new_chat_members) {
     if (m.is_bot) continue;
     await trackVisitor(m.id,m.username,m.first_name);
-    // Appliquer la durée par défaut du canal si définie
-    let provisionalGranted = false;
-    if (channel.default_duration_days) {
-      const exp=new Date(Date.now()+channel.default_duration_days*24*60*60*1000);
-      const linked=await getLinkedUser(m.id);
-      if (linked) {
-        const upd = await pool.query(
-          "UPDATE users SET subscription_expires_at=$1,is_premium=true WHERE id=$2 AND (subscription_expires_at IS NULL OR subscription_expires_at<NOW()) RETURNING id",
-          [exp, linked.id]
-        ).catch(()=>({rows:[]}));
-        if (upd.rows.length) {
-          provisionalGranted = true;
-          // Notifier le membre de son accès provisoire avec bouton de paiement
-          await bot.sendMessage(m.id,
-            `👋 Bienvenue *${esc(m.first_name||m.username||'!')}* !\n\n`+
-            `🎁 *Accès provisoire accordé* : *${channel.default_duration_days} jour(s)*\n`+
-            `• Expire le : *${fmtDate(exp)}*\n\n`+
-            `⚠️ Cet accès est temporaire. Pour continuer après expiration, finalisez votre paiement :`,
-            { parse_mode:'Markdown', reply_markup:{ inline_keyboard:[
-              [{ text:'💳 Payer maintenant', url:`${SITE_URL}/payment.html` }],
-              [{ text:'📊 Mon compte', callback_data:'mon_compte' }]
-            ]}}).catch(()=>{});
-        }
-      }
+    const expMs = Date.now() + FREE_HOURS_NEW_MEMBER*60*60*1000;
+    const exp   = new Date(expMs);
+    const linked = await getLinkedUser(m.id);
+
+    if (linked) {
+      // Membre lié → mettre à jour son abonnement si pas déjà actif
+      await pool.query(
+        `UPDATE users SET subscription_expires_at=$1,is_premium=true
+         WHERE id=$2 AND (subscription_expires_at IS NULL OR subscription_expires_at<NOW())`,
+        [exp, linked.id]
+      ).catch(()=>{});
     }
-    if (!provisionalGranted) {
-      await bot.sendMessage(m.id,
-        `👋 Bienvenue sur *Sossou Kouamé Shopping Boutique* !\n\nConnectez-vous ou créez un compte pour gérer votre abonnement.`,
-        { parse_mode:'Markdown', reply_markup:{ inline_keyboard:[
-          [{ text:'🔐 Se connecter', callback_data:'action_connexion' }],
-          [{ text:"📝 S'inscrire", callback_data:'action_inscription' }],
-          [{ text:'💳 Accéder au site', url: SITE_URL }]
-        ]}}).catch(()=>{});
-    }
+
+    // Toujours enregistrer dans channel_temp_access (permet le kick même si non lié)
+    await pool.query(
+      `INSERT INTO channel_temp_access(telegram_id,channel_id,tg_username,tg_first_name,expires_at)
+       VALUES($1,$2,$3,$4,$5)
+       ON CONFLICT(telegram_id) DO UPDATE SET expires_at=$5,kicked=FALSE,granted_at=NOW()`,
+      [m.id, String(channel.channel_id), m.username||null, m.first_name||null, exp]
+    ).catch(()=>{});
+
+    const prenom = esc(m.first_name||m.username||'');
+    await bot.sendMessage(m.id,
+      `👋 Bienvenue *${prenom}* dans *${esc(channel.channel_name||'le canal')}* !\n\n`+
+      `🎁 *${FREE_HOURS_NEW_MEMBER}h gratuites* vous sont accordées.\n`+
+      `⏰ Accès jusqu'à *${fmtDate(exp)}*\n\n`+
+      `⚠️ Après expiration, vous serez retiré automatiquement.\n`+
+      `Finalisez votre paiement pour continuer :`,
+      { parse_mode:'Markdown', reply_markup:{ inline_keyboard:[
+        [{ text:'💳 Souscrire maintenant', url:`${SITE_URL}/payment.html` }],
+        [{ text:'🔐 Se connecter au bot',  callback_data:'action_connexion'  }],
+        [{ text:"📝 Créer un compte",      callback_data:'action_inscription'}]
+      ]}}).catch(()=>{});
   }
 });
 
@@ -2336,10 +2437,12 @@ bot.on('my_chat_member', async (update) => {
 bot.onText(/\/start/, async (msg) => {
   const chatId=msg.chat.id;
   tgSessions.delete(chatId);
-  if (chatId===ADMIN_TG_ID) { await sendAdminDashboard(chatId); return; }
   const linked=await getLinkedUser(chatId);
-  if (linked) { await sendUserDashboard(chatId,linked); return; }
-  // Enregistrer l'interaction sans lien
+  if (linked) {
+    if (linked.is_admin) { await sendAdminDashboard(chatId); return; }
+    await sendUserDashboard(chatId,linked); return;
+  }
+  // Non connecté — menu invité
   await trackVisitor(chatId,msg.from?.username,msg.from?.first_name);
   await bot.sendMessage(chatId,
     `👋 Bienvenue sur *Sossou Kouamé Shopping Boutique*\n\nConnectez-vous ou créez un compte pour accéder à vos services.`,
@@ -2356,7 +2459,8 @@ bot.on('callback_query', async (query) => {
   if (data==='noop') return;
 
   // ── ADMIN ──
-  if (chatId===ADMIN_TG_ID) {
+  const _isAdmin = await isAdminUser(chatId);
+  if (_isAdmin) {
     if (data==='admin_dashboard')    { await sendAdminDashboard(chatId); return; }
     if (data==='admin_membres')      { await sendMembersAdmin(chatId,0); return; }
     if (data==='admin_strategies')   { await sendStrategiesAdmin(chatId); return; }
@@ -2411,6 +2515,77 @@ bot.on('callback_query', async (query) => {
         `🎯 *Nouvelle stratégie disponible !*\n\nLa stratégie *${stratName}* vous a été attribuée.\n\nTapez /start pour voir votre compte.`,
         {parse_mode:'Markdown'}).catch(()=>{});
       return;
+    }
+    // ── Membres expirés (accorder abonnement gratuit) ──────────────────────
+    if (data==='admin_expires') {
+      const now=new Date();
+      // Membres liés expirés
+      const [linkedExp, tempExp] = await Promise.all([
+        pool.query(`
+          SELECT telegram_id::bigint,username,first_name,last_name,subscription_expires_at
+          FROM users
+          WHERE telegram_id IS NOT NULL
+            AND (subscription_expires_at IS NULL OR subscription_expires_at<NOW())
+          ORDER BY subscription_expires_at DESC NULLS LAST LIMIT 25
+        `).catch(()=>({rows:[]})),
+        pool.query(`
+          SELECT telegram_id,tg_username,tg_first_name,expires_at
+          FROM channel_temp_access
+          WHERE expires_at<NOW() AND kicked=TRUE
+          ORDER BY expires_at DESC LIMIT 10
+        `).catch(()=>({rows:[]}))
+      ]);
+
+      const total = linkedExp.rows.length + tempExp.rows.length;
+      if (!total) {
+        await bot.sendMessage(chatId,
+          `✅ *Aucun membre expiré pour l'instant.*\n\nTous les membres actifs sont dans le canal.`,
+          SEND_OPT(KB_ADMIN_MENU)); return;
+      }
+
+      let msg=`🔴 *Membres expirés* (${total})\n━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+      msg+=`Sélectionnez un membre pour lui accorder du temps gratuit :\n`;
+
+      const btns=[];
+      for (const m of linkedExp.rows) {
+        const name=[m.first_name,m.last_name].filter(Boolean).join(' ')||m.username||`TG:${m.telegram_id}`;
+        const label=(name.length>22?name.substring(0,20)+'…':name);
+        const since=m.subscription_expires_at?`exp. ${fmtDate(m.subscription_expires_at)}`:'Jamais abonné';
+        btns.push([{text:`🔴 ${label} — ${since}`, callback_data:`grant_free_${m.telegram_id}`}]);
+      }
+      for (const m of tempExp.rows) {
+        const name=m.tg_first_name||m.tg_username||`TG:${m.telegram_id}`;
+        const label=(name.length>22?name.substring(0,20)+'…':name);
+        btns.push([{text:`⚫ ${label} — visiteur`, callback_data:`grant_free_${m.telegram_id}`}]);
+      }
+      btns.push([{text:'🔙 Menu admin',callback_data:'cancel'}]);
+      await bot.sendMessage(chatId, msg, SEND_OPT({inline_keyboard:btns})); return;
+    }
+
+    // ── Accorder abonnement gratuit à un membre expiré ─────────────────────
+    if (data.startsWith('grant_free_')) {
+      const tgId=data.replace('grant_free_','');
+      // Chercher le nom (lié ou non lié)
+      const lk=await pool.query(
+        `SELECT id,username,first_name,last_name FROM users WHERE telegram_id=$1`,[tgId]
+      ).catch(()=>({rows:[]}));
+      const tv=await pool.query(
+        `SELECT tg_username,tg_first_name FROM channel_temp_access WHERE telegram_id=$1`,[tgId]
+      ).catch(()=>({rows:[]}));
+      const name=(lk.rows.length
+        ? ([lk.rows[0].first_name,lk.rows[0].last_name].filter(Boolean).join(' ')||lk.rows[0].username)
+        : (tv.rows[0]?.tg_first_name||tv.rows[0]?.tg_username)
+      )||`ID:${tgId}`;
+      tgSessions.set(chatId,{step:'grant_free_time', target_tg_id:tgId, target_name:name});
+      await bot.sendMessage(chatId,
+        `🎁 *Accorder du temps gratuit à ${esc(name)}*\n\n`+
+        `Entrez la durée à accorder :\n`+
+        `• \`5h\` = 5 heures\n`+
+        `• \`30m\` ou \`30min\` = 30 minutes\n`+
+        `• \`2j\` ou \`2d\` = 2 jours\n`+
+        `• \`90\` = 90 minutes (nombre seul = minutes)\n\n`+
+        `L'accès sera accordé *en plus* de toute durée restante.`,
+        SEND_OPT({inline_keyboard:[[{text:'❌ Annuler',callback_data:'cancel'}]]})); return;
     }
     if (data==='cancel') { tgSessions.delete(chatId); bot.sendMessage(chatId,'❌ Annulé.',SEND_OPT(KB_ADMIN_MENU)); return; }
 
@@ -2611,21 +2786,39 @@ bot.on('callback_query', async (query) => {
   // ── Confirmation inscription ──
   if (data==='reg_confirm_yes') {
     const sess=tgSessions.get(chatId);
-    if (!sess||sess.step!=='reg_confirm') return;
+    if (!sess||sess.step!=='reg_final_confirm') return;
     tgSessions.delete(chatId);
     try {
       const exists=await pool.query("SELECT id FROM users WHERE username=$1",[sess.username]);
       if (exists.rows.length) { bot.sendMessage(chatId,'⚠️ Identifiant déjà pris. Tapez /start pour réessayer.'); return; }
       const hash=await bcrypt.hash(sess.password,10);
       const ins=await pool.query(
-        `INSERT INTO users(username,email,password_hash,plain_password,account_type) VALUES($1,$2,$3,$4,'Standard') RETURNING id,username,first_name,last_name,is_premium,is_pro,subscription_expires_at,account_type`,
-        [sess.username,sess.email,hash,sess.password]
+        `INSERT INTO users(username,first_name,last_name,password_hash,plain_password,account_type,promo_code,is_approved)
+         VALUES($1,$2,$3,$4,$5,$6,$7,TRUE)
+         RETURNING id,username,first_name,last_name,is_premium,is_pro,is_admin,subscription_expires_at,account_type`,
+        [sess.username, sess.first_name||null, sess.last_name||null, hash, sess.password,
+         sess.account_type||'Standard', sess.promo_code||null]
       );
       const newUser=ins.rows[0];
       await linkTgUser(chatId,newUser.id,query.from?.username,query.from?.first_name);
       await sendUserDashboard(chatId,newUser);
     } catch(e) { bot.sendMessage(chatId,'❌ Erreur création compte. Réessayez.'); console.error('[TG-REG]',e.message); }
     return;
+  }
+  // ── Sauter le code promo lors de l'inscription ──
+  if (data==='reg_skip_promo') {
+    const sess=tgSessions.get(chatId);
+    if (!sess||sess.step!=='reg_promo') return;
+    tgSessions.set(chatId,{...sess,step:'reg_name',promo_code:null});
+    bot.sendMessage(chatId,'👤 Entrez votre *prénom et nom* (ex: Jean Dupont) :',{parse_mode:'Markdown'}); return;
+  }
+  // ── Choix du type de compte lors de l'inscription ──
+  if (data==='reg_type_Standard'||data==='reg_type_Pro') {
+    const sess=tgSessions.get(chatId);
+    if (!sess||sess.step!=='reg_account_type') return;
+    const account_type=data==='reg_type_Standard'?'Standard':'Pro';
+    tgSessions.set(chatId,{...sess,step:'reg_password',account_type});
+    bot.sendMessage(chatId,`✅ Type : *${account_type}*\n\n🔑 Choisissez un *mot de passe* (min. 6 caractères) :`,{parse_mode:'Markdown'}); return;
   }
 
   // ── Menu utilisateur ──
@@ -2637,8 +2830,7 @@ bot.on('callback_query', async (query) => {
   }
   if (data==='deconnexion') {
     await unlinkTgUser(chatId);
-    const afterKb = chatId===ADMIN_TG_ID ? KB_ADMIN_MENU : KB_GUEST_MENU;
-    bot.sendMessage(chatId,'✅ Déconnecté.\n\nTapez /start pour vous reconnecter.',SEND_OPT(afterKb)); return;
+    bot.sendMessage(chatId,'✅ Déconnecté.\n\nTapez /start pour vous reconnecter.',SEND_OPT(KB_GUEST_MENU)); return;
   }
   if (data==='action_connexion') {
     tgSessions.set(chatId,{step:'login_username'});
@@ -2659,8 +2851,11 @@ bot.on('message', async (msg) => {
   const sess=tgSessions.get(chatId);
   if (!sess) return;
 
+  // Calcul une seule fois du statut admin
+  const _isAdmin = await isAdminUser(chatId);
+
   // Réponse durée canal (admin) ─────────────────────────────────────────────
-  if (chatId===ADMIN_TG_ID && sess.step==='canal_duration_confirm') {
+  if (_isAdmin && sess.step==='canal_duration_confirm') {
     if (text.toUpperCase()==='NON') {
       tgSessions.delete(chatId);
       bot.sendMessage(chatId,'❌ Aucune durée automatique configurée.',SEND_OPT(KB_ADMIN_MENU)); return;
@@ -2686,7 +2881,7 @@ bot.on('message', async (msg) => {
   }
 
   // ── Définir le temps d'un membre (admin) ─────────────────────────────────
-  if (chatId===ADMIN_TG_ID && sess.step==='set_member_time') {
+  if (_isAdmin && sess.step==='set_member_time') {
     const raw = text.trim().toLowerCase();
     const tgId = sess.target_tg_id;
     const userId = sess.target_user_id;
@@ -2752,8 +2947,96 @@ bot.on('message', async (msg) => {
     ); return;
   }
 
+  // ── Accorder temps gratuit à un membre expiré (admin) ────────────────────
+  if (_isAdmin && sess.step==='grant_free_time') {
+    const raw=text.trim().toLowerCase();
+    const tgId=sess.target_tg_id;
+    const name=sess.target_name;
+    tgSessions.delete(chatId);
+
+    // Parser la durée : 5h, 30m, 30min, 2j, 2d, 90 (minutes par défaut)
+    let totalMs=0;
+    const mMatch=raw.match(/^(\d+(?:\.\d+)?)\s*(?:m|min|mins|minutes?)$/);
+    const hMatch=raw.match(/^(\d+(?:\.\d+)?)\s*(?:h|hr|heure?s?)$/);
+    const dMatch=raw.match(/^(\d+(?:\.\d+)?)\s*(?:j|d|jours?|days?)$/);
+    const numOnly=raw.match(/^(\d+(?:\.\d+)?)$/);
+    if      (mMatch) totalMs=parseFloat(mMatch[1])*60*1000;
+    else if (hMatch) totalMs=parseFloat(hMatch[1])*3600*1000;
+    else if (dMatch) totalMs=parseFloat(dMatch[1])*86400*1000;
+    else if (numOnly) totalMs=parseFloat(numOnly[1])*60*1000; // nombre seul = minutes
+    else { bot.sendMessage(chatId,'⚠️ Format invalide.\n\nEx: `5h`, `30m`, `2j`, `90`',{parse_mode:'Markdown'}); return; }
+
+    if (totalMs<=0) { bot.sendMessage(chatId,'⚠️ Durée invalide.'); return; }
+
+    const channel=await getActiveChannel();
+    const now=new Date();
+    const newExpiry=new Date(now.getTime()+totalMs);
+    const durStr=raw;
+
+    // Chercher si membre lié ou non
+    const lk=await pool.query(
+      `SELECT id,username,first_name FROM users WHERE telegram_id=$1`,[tgId]
+    ).catch(()=>({rows:[]}));
+
+    if (lk.rows.length) {
+      // Membre lié → mettre à jour users
+      await pool.query(
+        `UPDATE users SET subscription_expires_at=GREATEST(subscription_expires_at, NOW())+$1*INTERVAL '1 millisecond',
+         is_premium=true WHERE id=$2`,
+        [totalMs, lk.rows[0].id]
+      ).catch(async ()=>{
+        // Fallback simple si l'arithmétique échoue
+        await pool.query(
+          `UPDATE users SET subscription_expires_at=$1,is_premium=true WHERE id=$2`,
+          [newExpiry, lk.rows[0].id]
+        );
+      });
+    }
+
+    // Mettre à jour / créer channel_temp_access pour permettre le réajout
+    await pool.query(
+      `INSERT INTO channel_temp_access(telegram_id,channel_id,expires_at,kicked)
+       VALUES($1,$2,$3,FALSE)
+       ON CONFLICT(telegram_id) DO UPDATE SET
+         expires_at=GREATEST(channel_temp_access.expires_at, NOW())+$4*INTERVAL '1 millisecond',
+         kicked=FALSE`,
+      [tgId, String(channel?.channel_id||''), newExpiry, totalMs]
+    ).catch(async ()=>{
+      await pool.query(
+        `UPDATE channel_temp_access SET expires_at=$1,kicked=FALSE WHERE telegram_id=$2`,
+        [newExpiry, tgId]
+      ).catch(()=>{});
+    });
+
+    // Générer un lien d'invitation et notifier le membre
+    let inviteLink=channel?.channel_invite_link||null;
+    if (channel) {
+      try {
+        const lnk=await bot.createChatInviteLink(channel.channel_id,{member_limit:1});
+        inviteLink=lnk.invite_link;
+      } catch {}
+    }
+    const memberName=esc(name||'membre');
+    await bot.sendMessage(tgId,
+      `🎁 *Accès gratuit accordé !*\n\n`+
+      `Bonjour *${memberName}*,\n\n`+
+      `L'administrateur vous a accordé *${durStr}* d'accès au canal.\n`+
+      `⏰ Expire le : *${fmtDate(newExpiry)}*\n\n`+
+      (inviteLink?`🔗 *Lien d'accès (usage unique) :*\n${inviteLink}`:
+        `Contactez l'administrateur pour obtenir votre lien d'accès.`),
+      {parse_mode:'Markdown'}
+    ).catch(()=>{});
+
+    await bot.sendMessage(chatId,
+      `✅ *${memberName}* — *${durStr}* accordé(e)\n`+
+      `⏰ Expire le : *${fmtDate(newExpiry)}*\n`+
+      `${inviteLink?'🔗 Lien envoyé au membre.':'⚠️ Impossible de générer le lien (bot non admin du canal).'}`,
+      SEND_OPT(KB_ADMIN_MENU)
+    ); return;
+  }
+
   // ── Lien d'inscription (admin) ────────────────────────────────────────────
-  if (chatId===ADMIN_TG_ID && sess.step==='set_inscription_link') {
+  if (_isAdmin && sess.step==='set_inscription_link') {
     tgSessions.delete(chatId);
     if (!text.startsWith('http')) {
       bot.sendMessage(chatId,'⚠️ URL invalide. Elle doit commencer par https://',SEND_OPT(KB_ADMIN_MENU)); return;
@@ -2770,7 +3053,7 @@ bot.on('message', async (msg) => {
   }
 
   // ── Saisir le lien du canal manuellement (admin) ───────────────────────────
-  if (chatId===ADMIN_TG_ID && sess.step==='config_canal_link') {
+  if (_isAdmin && sess.step==='config_canal_link') {
     tgSessions.delete(chatId);
     if (!text.startsWith('http')) { bot.sendMessage(chatId,'⚠️ Lien invalide. Doit commencer par http.'); return; }
     const channel = await getActiveChannel();
@@ -2803,41 +3086,69 @@ bot.on('message', async (msg) => {
     tgSessions.delete(chatId);
     try {
       const r=await pool.query(
-        `SELECT id,username,first_name,last_name,is_premium,is_pro,subscription_expires_at,account_type,password_hash,plain_password
+        `SELECT id,username,first_name,last_name,is_premium,is_pro,is_admin,is_banned,subscription_expires_at,account_type,password_hash,plain_password
          FROM users WHERE username=$1 OR email=$1`,[sess.username]);
       if (!r.rows.length) { bot.sendMessage(chatId,'❌ Identifiant ou mot de passe incorrect.\n\nTapez /start pour réessayer.'); return; }
       const user=r.rows[0];
+      if (user.is_banned) { bot.sendMessage(chatId,'🚫 Ce compte est banni.'); return; }
       let valid=false;
       if (user.password_hash) valid=await bcrypt.compare(text,user.password_hash);
       if (!valid&&user.plain_password) valid=(text===user.plain_password);
       if (!valid) { bot.sendMessage(chatId,'❌ Identifiant ou mot de passe incorrect.\n\nTapez /start pour réessayer.'); return; }
       await linkTgUser(chatId,user.id,msg.from?.username,msg.from?.first_name);
-      await sendUserDashboard(chatId,user);
+      // Admin → panneau admin ; Utilisateur → panneau utilisateur
+      if (user.is_admin) { await sendAdminDashboard(chatId); }
+      else { await sendUserDashboard(chatId,user); }
     } catch(e) { bot.sendMessage(chatId,'❌ Erreur serveur.'); console.error('[TG-LOGIN]',e.message); }
     return;
   }
 
   // Inscription
   if (sess.step==='reg_username') {
-    const username=text.replace(/\s/g,'');
+    const username=text.replace(/\s/g,'').toLowerCase();
+    if (username.length<3) { bot.sendMessage(chatId,'⚠️ Identifiant trop court (min. 3 car.). Réessayez :'); return; }
     const ex=await pool.query("SELECT id FROM users WHERE username=$1",[username]).catch(()=>({rows:[{id:1}]}));
     if (ex.rows.length) { bot.sendMessage(chatId,'⚠️ Identifiant déjà pris. Choisissez-en un autre :'); return; }
-    tgSessions.set(chatId,{step:'reg_email',username});
-    bot.sendMessage(chatId,'📧 Entrez votre *adresse email* :',{parse_mode:'Markdown'}); return;
+    tgSessions.set(chatId,{step:'reg_promo',username});
+    await bot.sendMessage(chatId,
+      `🎫 *Code promo (optionnel)*\n\nEntrez votre code promotionnel ou appuyez sur *Passer* :`,
+      SEND_OPT({inline_keyboard:[[{text:'⏭ Passer',callback_data:'reg_skip_promo'}],[{text:'❌ Annuler',callback_data:'cancel'}]]}));
+    return;
   }
-  if (sess.step==='reg_email') {
-    if (!text.includes('@')) { bot.sendMessage(chatId,'⚠️ Email invalide. Réessayez :'); return; }
-    if (!text.toLowerCase().endsWith('@gmail.com')) {
-      bot.sendMessage(chatId,'⚠️ Seuls les emails *Gmail* (@gmail.com) sont acceptés.\n\nEntrez votre adresse Gmail :',{parse_mode:'Markdown'}); return;
-    }
-    tgSessions.set(chatId,{...sess,step:'reg_password',email:text});
-    bot.sendMessage(chatId,'🔑 Choisissez un *mot de passe* (min. 6 caractères) :',{parse_mode:'Markdown'}); return;
+  if (sess.step==='reg_promo') {
+    tgSessions.set(chatId,{...sess,step:'reg_name',promo_code:text.trim().toUpperCase()});
+    bot.sendMessage(chatId,'👤 Entrez votre *prénom et nom* (ex: Jean Dupont) :',{parse_mode:'Markdown'}); return;
+  }
+  if (sess.step==='reg_name') {
+    const parts=text.trim().split(/\s+/);
+    const first_name=parts[0]||'';
+    const last_name=parts.slice(1).join(' ')||'';
+    tgSessions.set(chatId,{...sess,step:'reg_account_type',first_name,last_name});
+    await bot.sendMessage(chatId,
+      `🏷 *Type de compte*\n\nChoisissez votre type de compte :`,
+      SEND_OPT({inline_keyboard:[
+        [{text:'👤 Standard',callback_data:'reg_type_Standard'},{text:'⭐ Pro',callback_data:'reg_type_Pro'}],
+        [{text:'❌ Annuler',callback_data:'cancel'}]
+      ]})); return;
   }
   if (sess.step==='reg_password') {
     if (text.length<6) { bot.sendMessage(chatId,'⚠️ Trop court (min. 6 car.). Réessayez :'); return; }
-    tgSessions.set(chatId,{...sess,step:'reg_confirm',password:text});
+    tgSessions.set(chatId,{...sess,step:'reg_confirm_password',password:text});
+    bot.sendMessage(chatId,'🔑 *Confirmez* votre mot de passe :',{parse_mode:'Markdown'}); return;
+  }
+  if (sess.step==='reg_confirm_password') {
+    if (text!==sess.password) {
+      tgSessions.set(chatId,{...sess,step:'reg_password',password:undefined});
+      bot.sendMessage(chatId,'⚠️ Les mots de passe ne correspondent pas.\n\nChoisissez un mot de passe (min. 6 car.) :'); return;
+    }
+    tgSessions.set(chatId,{...sess,step:'reg_final_confirm'});
+    const fullName=[sess.first_name,sess.last_name].filter(Boolean).join(' ')||'—';
     await bot.sendMessage(chatId,
-      `✅ *Confirmer l'inscription ?*\n\n• Identifiant : \`${sess.username}\`\n• Email : ${sess.email}`,
+      `✅ *Confirmer l'inscription ?*\n\n`+
+      `• Identifiant : \`${esc(sess.username)}\`\n`+
+      `• Nom : ${esc(fullName)}\n`+
+      `• Code promo : ${sess.promo_code||'Aucun'}\n`+
+      `• Type : ${sess.account_type||'Standard'}`,
       SEND_OPT({inline_keyboard:[[
         {text:'✅ Confirmer',callback_data:'reg_confirm_yes'},
         {text:'❌ Annuler',callback_data:'cancel'}
@@ -2854,5 +3165,7 @@ app.listen(PORT, async () => {
   console.log("========================================");
   console.log(`Serveur Sossou Kouamé — Port ${PORT}`);
   console.log("========================================");
+  // Initialiser la BDD avant de seeder (garantit l'ordre correct)
+  await initDB().catch(e => console.error('[INIT-DB-FATAL]', e.message));
   await seedSettings();
 });
