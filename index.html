@@ -690,19 +690,25 @@
     }
     function togglePwd(){ const i=document.getElementById('password'); i.type=i.type==='password'?'text':'password'; }
 
-    // ── INSCRIPTION VIA BOT TELEGRAM ──
-    let _botUsername = '';
-    fetch('/api/config').then(r=>r.json()).then(d=>{
-      _botUsername = d.bot_username || '';
-      const link = _botUsername ? `https://t.me/${_botUsername}` : '#';
-      const tgLink = document.getElementById('tgRegLink');
-      if (tgLink) tgLink.href = link;
-    }).catch(()=>{});
+   // ── OUVERTURE VIA SITE WEB ──
+let _siteUrl = '';
 
-    function openTelegramBot(){
-      const url = _botUsername ? `https://t.me/${_botUsername}` : '#';
-      if (url !== '#') window.open(url, '_blank');
-    }
+fetch('/api/config')
+  .then(r => r.json())
+  .then(d => {
+    _siteUrl = d.site_url || '';
+
+    const link = _siteUrl ? _siteUrl : '#';
+    const siteLink = document.getElementById('siteLink');
+
+    if (siteLink) siteLink.href = link;
+  })
+  .catch(() => {});
+
+function openWebsite(){
+  const url = _siteUrl ? _siteUrl : '#';
+  if (url !== '#') window.open(url, '_blank');
+}
 
     // ── DÉCONNEXION ──
     async function doLogout(){
