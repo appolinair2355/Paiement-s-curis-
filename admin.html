@@ -3,312 +3,493 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Espace Admin — Sossou Kouamé</title>
-  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <title>Panneau administrateur — Sossou Kouamé Shopping Boutique</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
   <style>
-    :root{--gold:#F0C040;--gold2:#C9A030;--green:#10B981;--red:#EF4444;--blue:#6366F1;}
-    *{box-sizing:border-box;margin:0;padding:0;}
-    body{font-family:'Poppins',sans-serif;background:#070b18;color:#fff;min-height:100vh;}
-    .admin-nav{background:rgba(10,15,30,.95);border-bottom:1px solid rgba(240,192,64,.2);padding:0 24px;display:flex;align-items:center;justify-content:space-between;height:56px;position:sticky;top:0;z-index:100;backdrop-filter:blur(12px);}
-    .admin-logo{font-weight:800;font-size:.85rem;color:var(--gold);letter-spacing:.05em;}
-    .admin-badge{background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.4);color:#FCA5A5;padding:3px 10px;border-radius:20px;font-size:.7rem;font-weight:700;margin-left:10px;}
-    .nav-actions{display:flex;align-items:center;gap:10px;}
-    .btn-sm{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);color:rgba(255,255,255,.7);padding:6px 14px;border-radius:8px;font-size:.78rem;cursor:pointer;font-family:inherit;transition:.2s;}
-    .btn-sm:hover{background:rgba(255,255,255,.12);color:#fff;}
-    .btn-danger{background:rgba(239,68,68,.12);border-color:rgba(239,68,68,.3);color:#FCA5A5;}
-    .btn-danger:hover{background:rgba(239,68,68,.22);}
-    .btn-primary{background:linear-gradient(135deg,var(--gold),var(--gold2));color:#000;border:none;font-weight:700;}
-    .btn-primary:hover{opacity:.85;}
-    .wrap{max-width:1100px;margin:0 auto;padding:28px 20px 60px;}
-    .page-title{font-size:1.25rem;font-weight:800;color:#fff;margin-bottom:24px;}
-    .page-title span{color:var(--gold);}
+    /* ── Admin layout ─────────────────────────────────────────────────────── */
+    .admin-hero{background:linear-gradient(135deg,rgba(99,102,241,0.15),rgba(139,92,246,0.1));border:1px solid rgba(99,102,241,0.25);border-radius:20px;padding:24px;margin-bottom:22px}
+    .admin-hero h2{color:#A5B4FC;margin:0 0 4px}
+    .admin-hero p{color:rgba(255,255,255,0.65);margin:0;font-size:.9rem}
 
-    /* Stat cards */
-    .stats-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px;margin-bottom:28px;}
-    .stat-card{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:16px;padding:20px 18px;transition:.2s;}
-    .stat-card:hover{border-color:rgba(240,192,64,.3);}
-    .stat-label{font-size:.72rem;font-weight:600;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px;}
-    .stat-value{font-size:1.8rem;font-weight:800;color:#fff;line-height:1;}
-    .stat-sub{font-size:.73rem;color:rgba(255,255,255,.35);margin-top:5px;}
+    /* ── Tabs ─────────────────────────────────────────────────────────────── */
+    .tabs{display:flex;gap:6px;margin-bottom:20px;flex-wrap:wrap}
+    .tab-btn{background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);color:rgba(255,255,255,0.55);border-radius:10px;padding:8px 18px;cursor:pointer;font-size:.85rem;font-weight:600;font-family:inherit;transition:.2s}
+    .tab-btn.active{background:rgba(99,102,241,0.2);border-color:rgba(99,102,241,0.5);color:#A5B4FC}
+    .tab-btn:hover:not(.active){border-color:rgba(255,255,255,0.25);color:#fff}
+    .tab-pane{display:none}
+    .tab-pane.active{display:block}
 
-    /* Sections */
-    .section{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:18px;padding:22px;margin-bottom:22px;}
-    .section-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;flex-wrap:wrap;gap:10px;}
-    .section-title{font-size:.88rem;font-weight:700;color:rgba(255,255,255,.85);}
-    .section-title .icon{margin-right:7px;}
+    /* ── Stats ────────────────────────────────────────────────────────────── */
+    .stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:22px}
+    .stat-card{background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:14px;padding:16px}
+    .stat-label{color:rgba(255,255,255,0.5);font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;font-weight:700;margin-bottom:6px}
+    .stat-value{color:#fff;font-size:1.5rem;font-weight:800;line-height:1.1}
+    .stat-sub{color:rgba(255,255,255,0.4);font-size:.72rem;margin-top:4px}
 
-    /* Notif list */
-    .notif-list{display:flex;flex-direction:column;gap:8px;}
-    .notif-item{display:flex;align-items:center;gap:12px;background:rgba(16,185,129,.06);border:1px solid rgba(16,185,129,.18);border-radius:10px;padding:10px 14px;}
-    .notif-item .notif-icon{font-size:1.2rem;flex-shrink:0;}
-    .notif-item .notif-body{flex:1;min-width:0;}
-    .notif-item .notif-name{font-size:.83rem;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-    .notif-item .notif-meta{font-size:.72rem;color:rgba(255,255,255,.4);margin-top:2px;}
-    .notif-empty{text-align:center;color:rgba(255,255,255,.3);font-size:.83rem;padding:24px 0;}
+    /* ── Filters ──────────────────────────────────────────────────────────── */
+    .filters{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px;align-items:center}
+    .filters select,.filters input{background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.12);color:#fff;border-radius:8px;padding:8px 12px;font-size:.85rem;font-family:inherit;outline:none}
+    .filters input{flex:1;min-width:200px}
+    .filters button{background:rgba(240,192,64,0.15);border:1px solid rgba(240,192,64,0.35);color:#F0C040;border-radius:8px;padding:8px 14px;font-size:.85rem;cursor:pointer;font-weight:600;font-family:inherit}
+    .filters button.green{background:rgba(16,185,129,0.15);border-color:rgba(16,185,129,0.35);color:#10B981}
 
-    /* Members table */
-    .members-table{width:100%;border-collapse:collapse;font-size:.8rem;}
-    .members-table th{text-align:left;padding:9px 10px;color:rgba(255,255,255,.35);font-weight:600;font-size:.7rem;text-transform:uppercase;letter-spacing:.07em;border-bottom:1px solid rgba(255,255,255,.07);}
-    .members-table td{padding:9px 10px;border-bottom:1px solid rgba(255,255,255,.05);vertical-align:middle;}
-    .members-table tr:last-child td{border-bottom:none;}
-    .members-table tr:hover td{background:rgba(255,255,255,.02);}
-    .pill{display:inline-block;padding:2px 8px;border-radius:20px;font-size:.68rem;font-weight:700;}
-    .pill-active{background:rgba(16,185,129,.15);color:#34D399;border:1px solid rgba(16,185,129,.25);}
-    .pill-expired{background:rgba(239,68,68,.1);color:#FCA5A5;border:1px solid rgba(239,68,68,.2);}
-    .pill-none{background:rgba(255,255,255,.06);color:rgba(255,255,255,.4);border:1px solid rgba(255,255,255,.1);}
-    .pill-premium{background:rgba(240,192,64,.12);color:var(--gold);border:1px solid rgba(240,192,64,.25);}
+    /* ── Tables ───────────────────────────────────────────────────────────── */
+    .table-wrap{background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:14px;overflow:auto;max-height:60vh}
+    table.adm-table{width:100%;border-collapse:collapse;font-size:.82rem;min-width:700px}
+    .adm-table th{position:sticky;top:0;background:#0e1628;color:#F0C040;text-align:left;padding:10px 12px;font-weight:700;font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid rgba(255,255,255,0.1)}
+    .adm-table td{padding:9px 12px;border-bottom:1px solid rgba(255,255,255,0.05);color:rgba(255,255,255,0.85);vertical-align:middle}
+    .adm-table tr:hover td{background:rgba(255,255,255,0.03)}
 
-    /* Settings */
-    .setting-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
-    .input-setting{flex:1;min-width:200px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:10px;padding:10px 14px;color:#fff;font-size:.84rem;font-family:inherit;outline:none;transition:.2s;}
-    .input-setting:focus{border-color:var(--gold);background:rgba(240,192,64,.05);}
-    .setting-hint{font-size:.72rem;color:rgba(255,255,255,.35);margin-top:6px;}
+    /* ── Badges ───────────────────────────────────────────────────────────── */
+    .badge{display:inline-block;padding:3px 8px;border-radius:100px;font-size:.68rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
+    .b-validated{background:rgba(16,185,129,0.15);color:#10B981;border:1px solid rgba(16,185,129,0.3)}
+    .b-pending{background:rgba(240,192,64,0.15);color:#F0C040;border:1px solid rgba(240,192,64,0.3)}
+    .b-awaiting{background:rgba(59,130,246,0.15);color:#60A5FA;border:1px solid rgba(59,130,246,0.3)}
+    .b-support{background:rgba(236,72,153,0.15);color:#F472B6;border:1px solid rgba(236,72,153,0.3)}
+    .b-sub{background:rgba(99,102,241,0.15);color:#A5B4FC;border:1px solid rgba(99,102,241,0.3)}
+    .b-item{background:rgba(139,92,246,0.15);color:#C4B5FD;border:1px solid rgba(139,92,246,0.3)}
+    .b-green{background:rgba(16,185,129,0.15);color:#10B981;border:1px solid rgba(16,185,129,0.3)}
+    .b-red{background:rgba(248,113,113,0.15);color:#F87171;border:1px solid rgba(248,113,113,0.3)}
+    .b-gray{background:rgba(255,255,255,0.05);color:rgba(255,255,255,0.45);border:1px solid rgba(255,255,255,0.12)}
 
-    /* Loader */
-    .admin-loader{text-align:center;padding:60px 20px;color:rgba(255,255,255,.3);}
-    .spin{display:inline-block;width:32px;height:32px;border:3px solid rgba(255,255,255,.1);border-top-color:var(--gold);border-radius:50%;animation:spin .8s linear infinite;margin-bottom:12px;}
-    @keyframes spin{to{transform:rotate(360deg);}}
+    /* ── Strategy cards ───────────────────────────────────────────────────── */
+    .strat-target{display:flex;align-items:center;gap:6px;margin:3px 0;font-size:.75rem;color:rgba(255,255,255,0.65)}
+    .strat-target .tid{font-family:monospace;color:#60A5FA;font-size:.7rem}
+    .strat-target .tname{color:#10B981;font-size:.7rem}
+    .strat-target .tok{font-family:monospace;color:rgba(240,192,64,0.7);font-size:.7rem}
 
-    /* Toast */
-    #toast{position:fixed;bottom:24px;right:24px;background:rgba(16,185,129,.9);backdrop-filter:blur(8px);color:#fff;padding:12px 20px;border-radius:12px;font-size:.83rem;font-weight:600;z-index:999;transform:translateY(80px);opacity:0;transition:.3s;pointer-events:none;}
-    #toast.show{transform:translateY(0);opacity:1;}
-    #toast.err{background:rgba(239,68,68,.9);}
-    .overflow-x{overflow-x:auto;}
+    /* ── Channel edit ─────────────────────────────────────────────────────── */
+    .ch-name-input{background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.15);color:#fff;border-radius:6px;padding:5px 9px;font-size:.8rem;font-family:inherit;width:160px;outline:none}
+    .ch-save-btn{background:rgba(16,185,129,0.15);border:1px solid rgba(16,185,129,0.35);color:#10B981;border-radius:6px;padding:5px 10px;font-size:.75rem;cursor:pointer;font-family:inherit}
+
+    /* ── Misc ─────────────────────────────────────────────────────────────── */
+    .txid{font-family:monospace;font-size:.72rem;color:rgba(255,255,255,0.5);word-break:break-all;max-width:180px;display:inline-block}
+    .user-cell strong{color:#fff;display:block}
+    .user-cell small{color:rgba(255,255,255,0.45);font-size:.72rem}
+    .deny{padding:60px 20px;text-align:center;color:rgba(255,255,255,0.6)}
+    .section-title{font-size:.75rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,0.35);margin:0 0 12px}
+    .empty-row td{text-align:center;padding:32px 20px;color:rgba(255,255,255,0.4)}
   </style>
 </head>
 <body>
   <div class="bg-canvas"></div>
   <div class="grid-overlay"></div>
+  <div class="stars" id="stars"></div>
 
-  <!-- Nav -->
-  <nav class="admin-nav">
-    <div style="display:flex;align-items:center">
-      <span class="admin-logo">🏪 SOSSOU KOUAMÉ</span>
-      <span class="admin-badge">ADMIN</span>
-    </div>
-    <div class="nav-actions">
-      <span id="navAdminUser" style="font-size:.78rem;color:rgba(255,255,255,.4)"></span>
-      <button class="btn-sm" onclick="window.location.href='/dashboard.html'">👤 Espace utilisateur</button>
-      <button class="btn-sm btn-danger" onclick="doLogout()">🚪 Déconnexion</button>
+  <nav class="navbar">
+    <div class="nav-container">
+      <a href="/dashboard.html" class="logo-link">
+        <img src="logo-sk.png" alt="" class="logo-img" onerror="this.style.display='none'">
+        <span class="logo-text">SOSSOU KOUAMÉ SHOPPING BOUTIQUE</span>
+      </a>
+      <div class="nav-right">
+        <a href="/dashboard.html" class="btn-logout" style="text-decoration:none">← Retour</a>
+      </div>
     </div>
   </nav>
 
-  <div class="wrap">
-    <!-- Loader -->
-    <div id="adminLoader" class="admin-loader">
-      <div class="spin"></div>
-      <p>Chargement du panneau admin…</p>
-    </div>
+  <main class="page-main" style="position:relative;z-index:1">
+    <div class="container" style="max-width:1300px">
 
-    <div id="adminContent" style="display:none">
-      <div class="page-title">🛡 Panneau <span>Administrateur</span></div>
-
-      <!-- Stats -->
-      <div class="stats-grid" id="statsGrid"></div>
-
-      <!-- Notifications nouvelles inscriptions -->
-      <div class="section">
-        <div class="section-head">
-          <div class="section-title"><span class="icon">🔔</span>Nouvelles inscriptions <span id="recentCount" style="color:var(--gold);margin-left:6px"></span></div>
-          <button class="btn-sm" onclick="loadDashboard()">↻ Actualiser</button>
-        </div>
-        <div id="notifList" class="notif-list"></div>
+      <!-- Accès refusé -->
+      <div id="denyBox" class="deny" style="display:none">
+        <h2>🔒 Accès réservé</h2>
+        <p>Cette section est réservée à l'administrateur.</p>
+        <a href="/dashboard.html" class="btn-primary" style="text-decoration:none;display:inline-flex;margin-top:16px">Retour au dashboard</a>
       </div>
 
-      <!-- Paramètres : lien inscription -->
-      <div class="section">
-        <div class="section-head">
-          <div class="section-title"><span class="icon">🌐</span>Lien d'inscription du site</div>
+      <!-- Panneau admin principal -->
+      <div id="adminMain" style="display:none">
+        <div class="admin-hero">
+          <h2>🛡️ Panneau administrateur</h2>
+          <p>Paiements · Stratégies · Canaux Telegram · Utilisateurs — vue complète réservée à l'administrateur.</p>
         </div>
-        <div class="setting-row">
-          <input type="url" id="inscUrl" class="input-setting" placeholder="https://sossou-kouame-paiement.onrender.com/#register">
-          <button class="btn-sm btn-primary" onclick="saveInscLink()">💾 Enregistrer</button>
-        </div>
-        <p class="setting-hint">Ce lien est envoyé aux membres du bot Telegram qui souhaitent s'inscrire ou renouveler leur abonnement.</p>
-      </div>
 
-      <!-- Liste des membres -->
-      <div class="section">
-        <div class="section-head">
-          <div class="section-title"><span class="icon">👥</span>Tous les membres <span id="memberCount" style="color:rgba(255,255,255,.35);font-size:.78rem;margin-left:6px"></span></div>
-          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-            <input type="text" id="memberSearch" placeholder="Rechercher…" oninput="filterMembers()" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:8px;padding:6px 12px;color:#fff;font-size:.78rem;font-family:inherit;outline:none;width:160px;">
-            <button class="btn-sm" onclick="loadDashboard()">↻ Actualiser</button>
+        <!-- Tabs -->
+        <div class="tabs">
+          <button class="tab-btn active" onclick="switchTab('payments')">💳 Paiements</button>
+          <button class="tab-btn" onclick="switchTab('strategies')">📈 Stratégies</button>
+          <button class="tab-btn" onclick="switchTab('channels')">📡 Canaux Telegram</button>
+          <button class="tab-btn" onclick="switchTab('users')">👥 Utilisateurs</button>
+        </div>
+
+        <!-- ── TAB : Paiements ──────────────────────────────────────────── -->
+        <div id="tab-payments" class="tab-pane active">
+          <div class="stats-grid" id="statsGrid"></div>
+
+          <div class="filters">
+            <select id="fType">
+              <option value="">Tous types</option>
+              <option value="support">💖 Soutien</option>
+              <option value="subscription">✦ Abonnement</option>
+              <option value="item">🛍️ Boutique</option>
+            </select>
+            <select id="fStatus">
+              <option value="">Tous statuts</option>
+              <option value="validated">✓ Validé</option>
+              <option value="pending">⏳ En attente</option>
+              <option value="awaiting_screenshot">📸 En attente crypto</option>
+            </select>
+            <input id="fQ" type="text" placeholder="Recherche : identifiant, nom, référence…">
+            <button onclick="loadPayments()">🔍 Filtrer</button>
+            <button class="green" onclick="exportCSV()">⬇ Export CSV</button>
+          </div>
+
+          <div class="table-wrap">
+            <table class="adm-table" id="payTable">
+              <thead>
+                <tr>
+                  <th>#ID</th><th>Date</th><th>Identifiant / Nom</th><th>Type</th>
+                  <th>Produit / Palier</th><th>Montant</th><th>Méthode</th>
+                  <th>Statut</th><th>Référence transaction</th>
+                </tr>
+              </thead>
+              <tbody id="payBody">
+                <tr class="empty-row"><td colspan="9">Chargement…</td></tr>
+              </tbody>
+            </table>
           </div>
         </div>
-        <div class="overflow-x">
-          <table class="members-table" id="membersTable">
-            <thead>
-              <tr>
-                <th>#</th><th>Identifiant</th><th>Email</th><th>Type</th>
-                <th>Abonnement</th><th>Temps restant</th><th>Telegram</th><th>Inscrit le</th>
-              </tr>
-            </thead>
-            <tbody id="membersBody"></tbody>
-          </table>
+
+        <!-- ── TAB : Stratégies ─────────────────────────────────────────── -->
+        <div id="tab-strategies" class="tab-pane">
+          <div class="section-title">Stratégies configurées (depuis strategies-config.json → BDD)</div>
+          <div class="table-wrap">
+            <table class="adm-table" id="stratTable">
+              <thead>
+                <tr>
+                  <th>ID</th><th>Nom</th><th>Mode</th><th>Statut</th>
+                  <th>Cibles Telegram (bot · canal · format)</th>
+                </tr>
+              </thead>
+              <tbody id="stratBody">
+                <tr class="empty-row"><td colspan="5">Chargement…</td></tr>
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
 
-    </div><!-- /adminContent -->
-  </div><!-- /wrap -->
+        <!-- ── TAB : Canaux Telegram ────────────────────────────────────── -->
+        <div id="tab-channels" class="tab-pane">
+          <div class="section-title">Canaux Telegram enregistrés (depuis telegram_config)</div>
+          <div class="table-wrap">
+            <table class="adm-table" id="chanTable">
+              <thead>
+                <tr>
+                  <th>#</th><th>Channel ID (Telegram)</th><th>Nom du canal</th>
+                  <th>Statut</th><th>Lien d'invitation</th><th>Mis à jour</th>
+                </tr>
+              </thead>
+              <tbody id="chanBody">
+                <tr class="empty-row"><td colspan="6">Chargement…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
 
-  <div id="toast"></div>
+        <!-- ── TAB : Utilisateurs ───────────────────────────────────────── -->
+        <div id="tab-users" class="tab-pane">
+          <div class="section-title">Tous les comptes utilisateurs</div>
+          <div class="filters">
+            <input id="uQ" type="text" placeholder="Recherche : pseudo, email, telegram ID…" oninput="filterUsers()">
+          </div>
+          <div class="table-wrap">
+            <table class="adm-table" id="userTable">
+              <thead>
+                <tr>
+                  <th>#</th><th>Pseudo</th><th>Email</th><th>Type</th>
+                  <th>Abonnement</th><th>Telegram ID</th><th>Statut</th><th>Inscrit le</th>
+                </tr>
+              </thead>
+              <tbody id="userBody">
+                <tr class="empty-row"><td colspan="8">Chargement…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div><!-- /adminMain -->
+    </div>
+  </main>
 
   <script>
-    let allMembers = [];
-
-    async function doLogout(){
-      await fetch('/api/logout',{method:'POST'}).catch(()=>{});
-      window.location.href='/';
-    }
-
-    function showToast(msg, isErr=false){
-      const t=document.getElementById('toast');
-      t.textContent=msg; t.className='show'+(isErr?' err':'');
-      setTimeout(()=>t.className='',3000);
-    }
-
-    function fmtDate(d){
-      if(!d) return '—';
-      return new Date(d).toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit',year:'numeric'});
-    }
-    function fmtDatetime(d){
-      if(!d) return '—';
-      return new Date(d).toLocaleString('fr-FR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
-    }
-    function fmtRemaining(ms){
-      if(ms<=0) return null;
-      const s=Math.floor(ms/1000),m=Math.floor(s/60),h=Math.floor(m/60),d=Math.floor(h/24);
-      if(d>0)return `${d}j ${h%24}h`;
-      if(h>0)return `${h}h ${m%60}m`;
-      if(m>0)return `${m}m`;
-      return `${s}s`;
-    }
-
-    async function loadDashboard(){
-      const r = await fetch('/api/admin/dashboard');
-      if(!r.ok){
-        if(r.status===401||r.status===403){ window.location.href='/'; return; }
-        showToast('Erreur chargement',true); return;
+    /* ── Étoiles ── */
+    (function(){
+      const c=document.getElementById('stars');
+      for(let i=0;i<50;i++){
+        const s=document.createElement('div'); s.className='star';
+        const sz=Math.random()*1.5+.5;
+        s.style.cssText=`width:${sz}px;height:${sz}px;top:${Math.random()*100}%;left:${Math.random()*100}%;--dur:${2+Math.random()*4}s;--delay:${Math.random()*5}s`;
+        c.appendChild(s);
       }
-      const d = await r.json();
-      document.getElementById('adminLoader').style.display='none';
-      document.getElementById('adminContent').style.display='';
+    })();
 
-      // Stats
-      const now = new Date();
-      const u=d.users, p=d.payments;
-      document.getElementById('statsGrid').innerHTML=`
-        <div class="stat-card">
-          <div class="stat-label">Total inscrits</div>
-          <div class="stat-value">${u.total}</div>
-          <div class="stat-sub">💎 ${u.premium} premium · ⭐ ${u.pro} pro</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Liés Telegram</div>
-          <div class="stat-value">${u.tg_linked}</div>
-          <div class="stat-sub">${u.total>0?Math.round(u.tg_linked/u.total*100):0}% des membres</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Paiements validés</div>
-          <div class="stat-value">${p.validated}</div>
-          <div class="stat-sub">/${p.total} total · ⏳ ${p.pending} en attente</div>
-        </div>
-        <div class="stat-card" style="border-color:rgba(16,185,129,.25)">
-          <div class="stat-label">Revenus validés</div>
-          <div class="stat-value" style="color:#34D399">${parseFloat(p.revenue).toFixed(2)}</div>
-          <div class="stat-sub">USD · ≈ ${Math.round(p.revenue*656).toLocaleString('fr-FR')} XOF</div>
-        </div>
-      `;
+    let currentRows=[], allUsers=[];
+    let activeTab='payments';
 
-      // Notifications (dernières inscriptions)
-      const notifEl=document.getElementById('notifList');
-      document.getElementById('recentCount').textContent=`(${d.recent.length})`;
-      if(!d.recent.length){
-        notifEl.innerHTML='<div class="notif-empty">Aucune inscription récente</div>'; 
-      } else {
-        notifEl.innerHTML=d.recent.map(u=>`
-          <div class="notif-item">
-            <div class="notif-icon">🆕</div>
-            <div class="notif-body">
-              <div class="notif-name">@${u.username} <span style="color:rgba(255,255,255,.35);font-weight:400;font-size:.75rem">— ${u.email||'sans email'}</span></div>
-              <div class="notif-meta">Inscrit le ${fmtDatetime(u.created_at)} · Type : ${u.account_type||'Standard'}</div>
-            </div>
-          </div>`).join('');
-      }
-
-      // Lien inscription
-      if(d.inscription_url) document.getElementById('inscUrl').value=d.inscription_url;
-
-      // Membres
-      allMembers = d.members;
-      document.getElementById('memberCount').textContent=`(${allMembers.length})`;
-      renderMembers(allMembers);
+    /* ── Auth + boot ── */
+    async function boot(){
+      const me=await fetch('/api/me');
+      if(me.status===401){ location.href='/'; return; }
+      const u=await me.json();
+      if(!u.is_admin){ document.getElementById('denyBox').style.display='block'; return; }
+      document.getElementById('adminMain').style.display='block';
+      loadStats();
+      loadPayments();
     }
 
-    function renderMembers(list){
-      const now=new Date();
-      const tbody=document.getElementById('membersBody');
-      if(!list.length){ tbody.innerHTML='<tr><td colspan="8" style="text-align:center;padding:20px;color:rgba(255,255,255,.3)">Aucun membre</td></tr>'; return; }
-      tbody.innerHTML=list.map((m,i)=>{
-        const exp=m.subscription_expires_at?new Date(m.subscription_expires_at):null;
-        const active=exp&&exp>now;
-        const rem=active?fmtRemaining(exp-now):null;
-        const statusPill=active
-          ?`<span class="pill pill-active">✅ Actif</span>`
-          :exp?`<span class="pill pill-expired">❌ Expiré</span>`
-          :`<span class="pill pill-none">Aucun</span>`;
-        const typePill=m.is_premium
-          ?`<span class="pill pill-premium">💎 Premium</span>`
-          :`<span class="pill pill-none">${m.account_type||'Standard'}</span>`;
-        const tgPill=m.telegram_id
-          ?`<span class="pill pill-active">✅ Lié</span>`
-          :`<span class="pill pill-none">Non lié</span>`;
+    /* ── Tabs ── */
+    function switchTab(tab){
+      activeTab=tab;
+      document.querySelectorAll('.tab-btn').forEach((b,i)=>{
+        const tabs=['payments','strategies','channels','users'];
+        b.classList.toggle('active', tabs[i]===tab);
+      });
+      document.querySelectorAll('.tab-pane').forEach(p=>p.classList.remove('active'));
+      document.getElementById('tab-'+tab).classList.add('active');
+
+      if(tab==='strategies' && document.getElementById('stratBody').querySelector('.empty-row')) loadStrategies();
+      if(tab==='channels'   && document.getElementById('chanBody').querySelector('.empty-row'))   loadChannels();
+      if(tab==='users'      && document.getElementById('userBody').querySelector('.empty-row'))    loadUsers();
+    }
+
+    /* ── Stats ── */
+    async function loadStats(){
+      try{
+        const r=await fetch('/api/admin/stats');
+        if(!r.ok) return;
+        const d=await r.json();
+        const g=document.getElementById('statsGrid'); g.innerHTML='';
+        const t=d.totals||{};
+        const cards=[
+          {l:'Total paiements',v:(t.total_payments||0).toLocaleString('fr-FR'),s:`${t.unique_payers||0} payeurs uniques`},
+          {l:'Revenu validé',v:`${(t.total_validated_xof||0).toLocaleString('fr-FR')} XOF`,s:`$${(t.total_validated_usd||0).toFixed(2)}`},
+          {l:'Dernières 24h',v:(d.last_24h||0).toLocaleString('fr-FR'),s:'nouvelles demandes'},
+        ];
+        (d.by_type||[]).forEach(t=>{
+          const lbl=t.type==='support'?'💖 Soutien':t.type==='subscription'?'✦ Abonnements':'🛍️ Boutique';
+          cards.push({l:lbl,v:(t.n||0).toLocaleString('fr-FR'),s:`${t.payers||0} payeurs · ${(t.validated_xof||0).toLocaleString('fr-FR')} XOF validé`});
+        });
+        cards.forEach(c=>{
+          const el=document.createElement('div'); el.className='stat-card';
+          el.innerHTML=`<div class="stat-label">${c.l}</div><div class="stat-value">${c.v}</div><div class="stat-sub">${c.s}</div>`;
+          g.appendChild(el);
+        });
+      }catch(e){ console.error(e); }
+    }
+
+    /* ── Paiements ── */
+    async function loadPayments(){
+      const t=document.getElementById('fType').value;
+      const st=document.getElementById('fStatus').value;
+      const q=document.getElementById('fQ').value.trim();
+      const params=new URLSearchParams();
+      if(t) params.set('type',t);
+      if(st) params.set('status',st);
+      if(q) params.set('q',q);
+      document.getElementById('payBody').innerHTML='<tr class="empty-row"><td colspan="9">Chargement…</td></tr>';
+      try{
+        const r=await fetch('/api/admin/payments?'+params.toString());
+        if(!r.ok){ document.getElementById('payBody').innerHTML='<tr class="empty-row"><td colspan="9" style="color:#F87171">Erreur de chargement</td></tr>'; return; }
+        const d=await r.json();
+        currentRows=d.payments||[];
+        renderPayRows(currentRows);
+      }catch(e){
+        document.getElementById('payBody').innerHTML='<tr class="empty-row"><td colspan="9" style="color:#F87171">Erreur réseau</td></tr>';
+      }
+    }
+
+    function renderPayRows(rows){
+      const body=document.getElementById('payBody');
+      if(!rows.length){ body.innerHTML='<tr class="empty-row"><td colspan="9">Aucun paiement trouvé</td></tr>'; return; }
+      body.innerHTML=rows.map(r=>{
+        const dt=r.created_at?new Date(r.created_at).toLocaleString('fr-FR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}):'—';
+        const status=r.status||'—';
+        const sCls=status==='validated'?'b-validated':status==='pending'?'b-pending':'b-awaiting';
+        const tCls=r.type==='support'?'b-support':r.type==='subscription'?'b-sub':'b-item';
+        const tLbl=r.type==='support'?'💖 Soutien':r.type==='subscription'?'✦ Abonnement':'🛍️ Boutique';
+        const fullName=[r.first_name,r.last_name].filter(Boolean).join(' ');
         return `<tr>
-          <td style="color:rgba(255,255,255,.3)">${i+1}</td>
-          <td style="font-weight:600">@${m.username||'—'}</td>
-          <td style="color:rgba(255,255,255,.45)">${m.email||'—'}</td>
-          <td>${typePill}</td>
-          <td>${statusPill}</td>
-          <td style="color:${active?'#34D399':'rgba(255,255,255,.3)'};font-weight:${active?'600':'400'}">${rem||exp?fmtDate(exp):'—'}</td>
-          <td>${tgPill}</td>
-          <td style="color:rgba(255,255,255,.3)">${fmtDate(m.created_at||m.last_seen)}</td>
+          <td>#${r.id}</td>
+          <td style="white-space:nowrap">${dt}</td>
+          <td class="user-cell"><strong>${esc(r.username||'—')}</strong>${fullName?`<small>${esc(fullName)}</small>`:''}<small style="opacity:.6">user_id: ${r.user_id||'—'}</small></td>
+          <td><span class="badge ${tCls}">${tLbl}</span></td>
+          <td>${esc(r.plan_label||'—')}<br><small style="color:rgba(255,255,255,0.35);font-size:.7rem">${esc(r.plan_id||'')}</small></td>
+          <td><strong>${(r.amount_xof||0).toLocaleString('fr-FR')} XOF</strong><br><small style="color:rgba(255,255,255,0.35);font-size:.7rem">$${(Number(r.amount_usd)||0).toFixed(2)}</small></td>
+          <td>${r.payment_method==='crypto'?'₿ Crypto':'📱 Mobile'}</td>
+          <td><span class="badge ${sCls}">${status}</span></td>
+          <td><span class="txid">${esc(r.transaction_id||'—')}</span></td>
         </tr>`;
       }).join('');
     }
 
-    function filterMembers(){
-      const q=document.getElementById('memberSearch').value.toLowerCase();
-      if(!q){ renderMembers(allMembers); return; }
-      renderMembers(allMembers.filter(m=>
-        (m.username||'').toLowerCase().includes(q)||
-        (m.email||'').toLowerCase().includes(q)
+    function exportCSV(){
+      if(!currentRows.length){ alert('Aucune donnée à exporter'); return; }
+      const headers=['id','date','username','nom_complet','user_id','type','plan_id','plan_label','amount_xof','amount_usd','payment_method','status','transaction_id'];
+      const rows=[headers.join(',')];
+      currentRows.forEach(r=>{
+        const full=[r.first_name,r.last_name].filter(Boolean).join(' ');
+        const line=[r.id,r.created_at||'',r.username||'',full,r.user_id||'',r.type,r.plan_id||'',r.plan_label||'',r.amount_xof||0,r.amount_usd||0,r.payment_method||'',r.status||'',r.transaction_id||''];
+        rows.push(line.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(','));
+      });
+      dl(new Blob([rows.join('\n')],{type:'text/csv;charset=utf-8'}),`paiements_${new Date().toISOString().slice(0,10)}.csv`);
+    }
+    function dl(blob,name){ const u=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=u; a.download=name; a.click(); URL.revokeObjectURL(u); }
+
+    /* ── Stratégies ── */
+    async function loadStrategies(){
+      document.getElementById('stratBody').innerHTML='<tr class="empty-row"><td colspan="5">Chargement…</td></tr>';
+      try{
+        const r=await fetch('/api/admin/strategies');
+        if(!r.ok){ document.getElementById('stratBody').innerHTML='<tr class="empty-row"><td colspan="5" style="color:#F87171">Erreur</td></tr>'; return; }
+        const d=await r.json();
+        renderStrategies(d.strategies||[]);
+      }catch(e){
+        document.getElementById('stratBody').innerHTML='<tr class="empty-row"><td colspan="5" style="color:#F87171">Erreur réseau</td></tr>';
+      }
+    }
+
+    function renderStrategies(strats){
+      const body=document.getElementById('stratBody');
+      if(!strats.length){ body.innerHTML='<tr class="empty-row"><td colspan="5">Aucune stratégie</td></tr>'; return; }
+      body.innerHTML=strats.map(s=>{
+        const enabled=s.enabled
+          ?'<span class="badge b-green">✓ Actif</span>'
+          :'<span class="badge b-red">✗ Inactif</span>';
+        const targets=(s.tg_targets||[]).map(t=>{
+          const name=t.channel_name?`<span class="tname">${esc(t.channel_name)}</span>`:'<span style="opacity:.4;font-size:.7rem">sans nom</span>';
+          return `<div class="strat-target">
+            <span class="tok">🤖 ${esc(t.bot_token_masked)}</span>
+            <span style="opacity:.4">→</span>
+            <span class="tid">${esc(t.channel_id)}</span>
+            ${name}
+            ${t.tg_format!=null?`<span style="opacity:.4;font-size:.68rem">fmt:${t.tg_format}</span>`:''}
+          </div>`;
+        }).join('') || '<span style="opacity:.35;font-size:.75rem">— aucune cible</span>';
+        return `<tr>
+          <td style="font-weight:700;color:#A5B4FC">S${s.id}</td>
+          <td style="font-weight:600;color:#fff">${esc(s.name)}</td>
+          <td><span style="font-family:monospace;font-size:.75rem;color:rgba(255,255,255,0.5)">${esc(s.mode||'—')}</span></td>
+          <td>${enabled}</td>
+          <td>${targets}</td>
+        </tr>`;
+      }).join('');
+    }
+
+    /* ── Canaux Telegram ── */
+    async function loadChannels(){
+      document.getElementById('chanBody').innerHTML='<tr class="empty-row"><td colspan="6">Chargement…</td></tr>';
+      try{
+        const r=await fetch('/api/admin/telegram-channels');
+        if(!r.ok){ document.getElementById('chanBody').innerHTML='<tr class="empty-row"><td colspan="6" style="color:#F87171">Erreur</td></tr>'; return; }
+        const d=await r.json();
+        renderChannels(d.channels||[]);
+      }catch(e){
+        document.getElementById('chanBody').innerHTML='<tr class="empty-row"><td colspan="6" style="color:#F87171">Erreur réseau</td></tr>';
+      }
+    }
+
+    function renderChannels(channels){
+      const body=document.getElementById('chanBody');
+      if(!channels.length){ body.innerHTML='<tr class="empty-row"><td colspan="6">Aucun canal Telegram</td></tr>'; return; }
+      body.innerHTML=channels.map(c=>{
+        const dt=c.updated_at?new Date(c.updated_at).toLocaleString('fr-FR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}):'—';
+        const enabled=c.enabled
+          ?'<span class="badge b-green">✓ Actif</span>'
+          :'<span class="badge b-gray">Inactif</span>';
+        const link=c.channel_invite_link
+          ?`<a href="${esc(c.channel_invite_link)}" target="_blank" style="color:#60A5FA;font-size:.78rem;text-decoration:none">🔗 Ouvrir</a>`
+          :'<span style="opacity:.35;font-size:.75rem">—</span>';
+        return `<tr>
+          <td style="color:rgba(255,255,255,0.4)">#${c.id}</td>
+          <td><span style="font-family:monospace;font-size:.8rem;color:#60A5FA">${esc(c.channel_id)}</span></td>
+          <td>
+            <input class="ch-name-input" id="chname_${c.id}" value="${esc(c.channel_name||'')}" placeholder="Nom du canal…">
+            <button class="ch-save-btn" onclick="saveChannelName(${c.id})">Enregistrer</button>
+          </td>
+          <td>${enabled}</td>
+          <td>${link}</td>
+          <td style="white-space:nowrap;color:rgba(255,255,255,0.4);font-size:.75rem">${dt}</td>
+        </tr>`;
+      }).join('');
+    }
+
+    async function saveChannelName(id){
+      const inp=document.getElementById('chname_'+id);
+      if(!inp) return;
+      const name=inp.value.trim();
+      try{
+        const r=await fetch(`/api/admin/telegram-channels/${id}/name`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({channel_name:name})});
+        if(r.ok){
+          inp.style.borderColor='rgba(16,185,129,0.6)';
+          setTimeout(()=>inp.style.borderColor='',1500);
+        }
+      }catch{}
+    }
+
+    /* ── Utilisateurs ── */
+    async function loadUsers(){
+      document.getElementById('userBody').innerHTML='<tr class="empty-row"><td colspan="8">Chargement…</td></tr>';
+      try{
+        const r=await fetch('/api/admin/users');
+        if(!r.ok){ document.getElementById('userBody').innerHTML='<tr class="empty-row"><td colspan="8" style="color:#F87171">Erreur</td></tr>'; return; }
+        const d=await r.json();
+        allUsers=d.users||[];
+        renderUsers(allUsers);
+      }catch(e){
+        document.getElementById('userBody').innerHTML='<tr class="empty-row"><td colspan="8" style="color:#F87171">Erreur réseau</td></tr>';
+      }
+    }
+
+    function filterUsers(){
+      const q=(document.getElementById('uQ').value||'').toLowerCase();
+      if(!q){ renderUsers(allUsers); return; }
+      renderUsers(allUsers.filter(u=>
+        (u.username||'').toLowerCase().includes(q)||
+        (u.email||'').toLowerCase().includes(q)||
+        (u.telegram_id||'').toLowerCase().includes(q)||
+        (u.first_name||'').toLowerCase().includes(q)||
+        (u.last_name||'').toLowerCase().includes(q)
       ));
     }
 
-    async function saveInscLink(){
-      const url=document.getElementById('inscUrl').value.trim();
-      if(!url){ showToast('Entrez un lien',true); return; }
-      const r=await fetch('/api/admin/settings',{
-        method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({inscription_url:url})
-      });
-      if(r.ok) showToast('✅ Lien enregistré !');
-      else showToast('Erreur lors de l\'enregistrement',true);
+    function renderUsers(users){
+      const body=document.getElementById('userBody');
+      if(!users.length){ body.innerHTML='<tr class="empty-row"><td colspan="8">Aucun utilisateur</td></tr>'; return; }
+      const now=new Date();
+      body.innerHTML=users.map(u=>{
+        const fullName=[u.first_name,u.last_name].filter(Boolean).join(' ');
+        const isActive=u.subscription_expires_at&&new Date(u.subscription_expires_at)>now;
+        const sub=u.subscription_expires_at
+          ?(isActive
+            ?`<span class="badge b-green">Actif</span><small style="display:block;font-size:.68rem;color:rgba(255,255,255,0.4);margin-top:2px">exp: ${new Date(u.subscription_expires_at).toLocaleDateString('fr-FR')}</small>`
+            :`<span class="badge b-red">Expiré</span>`)
+          :'<span class="badge b-gray">Inactif</span>';
+        const type=u.is_admin?'<span class="badge b-sub">Admin</span>'
+          :u.is_pro?'<span class="badge b-green">Pro</span>'
+          :u.is_premium?'<span class="badge b-awaiting">Premium</span>'
+          :'<span class="badge b-gray">Standard</span>';
+        const banned=u.is_banned?'<span class="badge b-red" style="margin-left:4px">Banni</span>':'';
+        const dt=u.created_at?new Date(u.created_at).toLocaleDateString('fr-FR'):'—';
+        return `<tr>
+          <td style="color:rgba(255,255,255,0.4)">#${u.id}</td>
+          <td class="user-cell"><strong>${esc(u.username||'—')}</strong>${fullName?`<small>${esc(fullName)}</small>`:''}</td>
+          <td style="color:rgba(255,255,255,0.55);font-size:.8rem">${esc(u.email||'—')}</td>
+          <td>${type}${banned}</td>
+          <td>${sub}</td>
+          <td style="font-family:monospace;font-size:.75rem;color:#60A5FA">${esc(u.telegram_id||'—')}</td>
+          <td>${u.is_banned?'<span class="badge b-red">Banni</span>':'<span class="badge b-green">OK</span>'}</td>
+          <td style="color:rgba(255,255,255,0.4);font-size:.78rem;white-space:nowrap">${dt}</td>
+        </tr>`;
+      }).join('');
     }
 
-    // Init
-    (async()=>{
-      const me=await fetch('/api/me').catch(()=>null);
-      if(!me||!me.ok){ window.location.href='/'; return; }
-      const u=await me.json();
-      if(!u.is_admin){ window.location.href='/dashboard.html'; return; }
-      document.getElementById('navAdminUser').textContent=`👤 ${u.username}`;
-      await loadDashboard();
-      // Actualiser toutes les 60s
-      setInterval(loadDashboard,60000);
-    })();
+    /* ── Utilitaires ── */
+    function esc(s){ return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+    boot();
   </script>
 </body>
 </html>

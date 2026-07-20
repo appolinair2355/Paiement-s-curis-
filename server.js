@@ -1627,6 +1627,86 @@ app.get("/api/admin/channel-members", async (req, res) => {
   }
 });
 
+// ─── ADMIN: Stratégies ───────────────────────────────────────────────────
+app.get("/api/admin/strategies", requireAdmin, async (req, res) => {
+  try {
+    const r = await pool.query("SELECT value FROM settings WHERE key='strategies_config'");
+    let strategies = [];
+    if (r.rows.length > 0) {
+      try { strategies = JSON.parse(r.rows[0].value); } catch {}
+    }
+    // Récupérer les noms de canaux depuis telegram_config
+    const chans = await pool.query("SELECT channel_id, channel_name FROM telegram_config");
+    const chanMap = {};
+    for (const row of chans.rows) { chanMap[row.channel_id] = row.channel_name || ''; }
+
+    const enriched = strategies.map(s => ({
+      id:       s.id,
+      name:     s.name,
+      mode:     s.mode,
+      enabled:  s.enabled,
+      tg_targets: (s.tg_targets || []).map(t => ({
+        bot_token_masked: t.bot_token ? `${t.bot_token.split(':')[0]}:...${t.bot_token.slice(-8)}` : '',
+        bot_token:        t.bot_token || '',
+        channel_id:       t.channel_id || '',
+        channel_name:     chanMap[t.channel_id] || '',
+        tg_format:        t.tg_format || null,
+      })),
+    }));
+    res.json({ strategies: enriched });
+  } catch (e) {
+    console.error("[ADMIN-STRATEGIES]", e);
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
+
+// ─── ADMIN: Canaux Telegram ───────────────────────────────────────────────
+app.get("/api/admin/telegram-channels", requireAdmin, async (req, res) => {
+  try {
+    const r = await pool.query("SELECT * FROM telegram_config ORDER BY updated_at DESC");
+    res.json({ channels: r.rows });
+  } catch (e) {
+    console.error("[ADMIN-TG-CHANNELS]", e);
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
+
+// ─── ADMIN: Mettre à jour le nom d'un canal ───────────────────────────────
+app.post("/api/admin/telegram-channels/:id/name", requireAdmin, async (req, res) => {
+  const { channel_name } = req.body;
+  try {
+    await pool.query("UPDATE telegram_config SET channel_name=$1, updated_at=NOW() WHERE id=$2",
+      [channel_name || '', req.params.id]);
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
+
+// ─── ADMIN: Utilisateurs ──────────────────────────────────────────────────
+app.get("/api/admin/users", requireAdmin, async (req, res) => {
+  try {
+    const r = await pool.query(
+      `SELECT id, username, email, first_name, last_name, account_type,
+              is_premium, is_pro, is_admin, is_banned,
+              subscription_expires_at, telegram_id, created_at, last_seen
+       FROM users ORDER BY created_at DESC`
+    );
+    res.json({ users: r.rows });
+  } catch (e) {
+    console.error("[ADMIN-USERS]", e);
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
+
+// ─── CHARGEMENT DU FICHIER DE CONFIG STRATÉGIES ──────────────────────────
+let STRATEGIES_CONFIG = null;
+try {
+  STRATEGIES_CONFIG = require('./strategies-config.json');
+} catch (e) {
+  console.warn('[SEED] strategies-config.json introuvable:', e.message);
+}
+
 // ─── SEEDING BDD : initialise les clés manquantes en settings ────────────
 async function seedSettings() {
   try {
@@ -1649,8 +1729,76 @@ async function seedSettings() {
       );
       console.log("[SEED] strategy_prices créé en BDD");
     }
+
+    // Importer les stratégies depuis strategies-config.json
+    await seedStrategiesConfig();
   } catch (e) {
     console.error("[SEED-ERR]", e.message);
+  }
+}
+
+// ─── SEED : stratégies + canaux Telegram depuis le fichier de config ──────
+async function seedStrategiesConfig() {
+  if (!STRATEGIES_CONFIG) return;
+  try {
+    const strategies = STRATEGIES_CONFIG.strategies || [];
+
+    // 1. Stocker toutes les stratégies dans settings.strategies_config (toujours mis à jour)
+    await pool.query(
+      `INSERT INTO settings(key,value,updated_at) VALUES('strategies_config',$1,NOW())
+       ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value, updated_at=NOW()`,
+      [JSON.stringify(strategies)]
+    );
+
+    // 2. Construire strategy_shop_desc depuis bilan_last.data
+    const bilanData = STRATEGIES_CONFIG.bilan_last?.data || [];
+    if (bilanData.length > 0) {
+      const shopDesc = {};
+      for (const d of bilanData) {
+        shopDesc[d.stratId] = {
+          winRate:    d.winRate    || 0,
+          total:      d.total      || 0,
+          wins:       d.totalWins  || 0,
+          losses:     d.totalLosses || 0,
+          name:       d.name       || d.stratId,
+        };
+      }
+      await pool.query(
+        `INSERT INTO settings(key,value,updated_at) VALUES('strategy_shop_desc',$1,NOW())
+         ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value, updated_at=NOW()`,
+        [JSON.stringify(shopDesc)]
+      );
+      console.log(`[SEED] strategy_shop_desc mis à jour (${bilanData.length} stratégies)`);
+    }
+
+    // 3. Collecter tous les canaux uniques depuis les tg_targets
+    const chanMap = new Map(); // channel_id → '' (nom à remplir depuis DB)
+    for (const s of strategies) {
+      for (const t of (s.tg_targets || [])) {
+        if (t.channel_id && !chanMap.has(t.channel_id)) {
+          chanMap.set(t.channel_id, '');
+        }
+      }
+    }
+
+    // 4. Upsert dans telegram_config (sans écraser les noms déjà définis)
+    for (const [channelId] of chanMap) {
+      await pool.query(
+        `INSERT INTO telegram_config(channel_id, channel_name, enabled, updated_at)
+         VALUES($1, $2, TRUE, NOW())
+         ON CONFLICT(channel_id) DO UPDATE
+           SET enabled = TRUE,
+               updated_at = EXCLUDED.updated_at`,
+        [channelId, '']
+      );
+    }
+    if (chanMap.size > 0) {
+      console.log(`[SEED] ${chanMap.size} canaux Telegram synchronisés dans telegram_config`);
+    }
+
+    console.log(`[SEED] strategies_config mis à jour (${strategies.length} stratégies)`);
+  } catch (e) {
+    console.error("[SEED-STRATEGIES]", e.message);
   }
 }
 
