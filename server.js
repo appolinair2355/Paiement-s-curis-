@@ -14,7 +14,7 @@ const app  = express();
 const PORT = process.env.PORT || 5000;
 
 // ─── URL DU SITE (pour les boutons Telegram / emails) ─────────────────────
-const SITE_URL = process.env.SITE_URL || 'https://sossou-kouame-paiement.onrender.com';
+const SITE_URL = process.env.SITE_URL || 'https://solarium-1-rj14.onrender.com';
 
 // ─── BASE DE DONNÉES ──────────────────────────────────────────────────────
 const DB_URL = 'postgresql://bonjour_user:WzeZsFKlKWU180iOFxngBEaThdG1kKUR@dpg-d962464s728c73e8p250-a.oregon-postgres.render.com/bonjour';
