@@ -8,16 +8,22 @@ const path       = require("path");
 const { Pool }   = require("pg");
 const bcrypt     = require("bcrypt");
 const session    = require("express-session");
+const pgSession  = require("connect-pg-simple")(session);
 const nodemailer = require("nodemailer");
+const { initUserbot, scanExistingMembers, isUserbotReady } = require("./telegram-userbot");
 
 const app  = express();
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 10000;
 
 // ─── URL DU SITE (pour les boutons Telegram / emails) ─────────────────────
-const SITE_URL = process.env.SITE_URL || 'https://solarium-1-rj14.onrender.com';
+const SITE_URL = process.env.SITE_URL || 'https://sossou-kouame-paiement.onrender.com';
 
 // ─── BASE DE DONNÉES ──────────────────────────────────────────────────────
-const DB_URL = 'postgresql://bonjour_user:WzeZsFKlKWU180iOFxngBEaThdG1kKUR@dpg-d962464s728c73e8p250-a.oregon-postgres.render.com/bonjour';
+// ⚠️ Toujours fournir DATABASE_URL (ou DB_URL) en variable d'environnement sur Render.
+const DB_URL = process.env.DATABASE_URL || process.env.DB_URL;
+if (!DB_URL) {
+  console.error('[FATAL] Aucune variable DATABASE_URL / DB_URL définie. Configurez-la dans Render → Environment.');
+}
 const pool = new Pool({
   connectionString: DB_URL,
   ssl: { rejectUnauthorized: false },
@@ -27,9 +33,9 @@ const pool = new Pool({
 });
 
 // ─── EMAIL (nodemailer / Gmail) ───────────────────────────────────────────
-const GMAIL_USER  = 'sossoukouam@gmail.com';
-const GMAIL_PASS  = 'gcwbgdpqntabwlud';
-const ADMIN_EMAIL = 'sossoukouam@gmail.com';
+const GMAIL_USER  = process.env.GMAIL_USER  || '';
+const GMAIL_PASS  = process.env.GMAIL_PASS  || '';
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL || GMAIL_USER;
 
 const gmailTransport = nodemailer.createTransport({
   service: "gmail",
@@ -89,7 +95,7 @@ async function sendPaymentEmail(userId, details) {
 
 // ─── MONEY FUSION ─────────────────────────────────────────────────────────
 const CONFIG = {
-  API_URL:    "https://pay.moneyfusion.net/Paiements_m/7da7654df194be93/pay/",
+  API_URL:    process.env.MONEY_FUSION_API_URL || "https://pay.moneyfusion.net/Paiements_m/7da7654df194be93/pay/",
   STATUS_URL: "https://pay.moneyfusion.net/paiementNotif",
   API_KEY:    process.env.MONEY_FUSION_API_KEY || "",
 };
@@ -134,6 +140,7 @@ async function initDB() {
       ALTER TABLE users ADD COLUMN IF NOT EXISTS is_pro BOOLEAN DEFAULT FALSE;
       ALTER TABLE users ADD COLUMN IF NOT EXISTS first_name TEXT;
       ALTER TABLE users ADD COLUMN IF NOT EXISTS last_name TEXT;
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS promo_code TEXT;
 
       CREATE TABLE IF NOT EXISTS settings (
         key TEXT PRIMARY KEY,
@@ -247,25 +254,35 @@ async function initDB() {
       );
     `);
 
-    // Comptes admin (créés/mis à jour au démarrage — idempotent)
+    // Compte administrateur (créé une seule fois — n'écrase JAMAIS un mot de
+    // passe existant, pour que le changement de mot de passe depuis le
+    // panneau admin ne soit pas effacé à chaque redémarrage du serveur).
     const bcryptLib = require('bcrypt');
-    const h1 = await bcryptLib.hash('arrow2025', 10);
-    const h2 = await bcryptLib.hash('arrow2026', 10);
-    // buzzinfluence — compte standard non-admin (admin_level=0)
-    await pool.query(
-      `INSERT INTO users (username, email, password_hash, is_admin, is_approved, account_type)
-       VALUES ('buzzinfluence','buzz@baccarat.pro',$1,FALSE,TRUE,'Standard')
-       ON CONFLICT (username) DO UPDATE SET password_hash=EXCLUDED.password_hash, is_admin=FALSE, is_approved=TRUE`,
-      [h1]
-    );
-    // sossoukouam — super-admin
-    await pool.query(
-      `INSERT INTO users (username, email, password_hash, is_admin, is_approved, account_type)
-       VALUES ('sossoukouam','sossoukouam@gmail.com',$1,TRUE,TRUE,'Admin')
-       ON CONFLICT (username) DO UPDATE SET password_hash=EXCLUDED.password_hash, is_admin=TRUE, is_approved=TRUE, account_type='Admin'`,
-      [h2]
-    );
-    console.log('✅ Base de données initialisée (sossoukouam=admin, buzzinfluence=standard)');
+    const ADMIN_USERNAME      = process.env.ADMIN_USERNAME || 'sossoukouam';
+    const ADMIN_INITIAL_PASS  = process.env.ADMIN_PASSWORD || null;
+    const existingAdmin = await pool.query("SELECT id FROM users WHERE username=$1", [ADMIN_USERNAME]);
+    if (!existingAdmin.rows.length) {
+      // Premier démarrage : si aucun ADMIN_PASSWORD n'est fourni, on en
+      // génère un aléatoire et on l'affiche UNE SEULE FOIS dans les logs
+      // Render, pour éviter tout mot de passe par défaut connu à l'avance.
+      const crypto = require('crypto');
+      const generated = ADMIN_INITIAL_PASS || crypto.randomBytes(9).toString('base64').replace(/[^a-zA-Z0-9]/g,'').slice(0,12);
+      const h = await bcryptLib.hash(generated, 10);
+      await pool.query(
+        `INSERT INTO users (username, email, password_hash, is_admin, is_approved, account_type)
+         VALUES ($1,$2,$3,TRUE,TRUE,'Admin')`,
+        [ADMIN_USERNAME, ADMIN_EMAIL || null, h]
+      );
+      if (!ADMIN_INITIAL_PASS) {
+        console.log('========================================');
+        console.log(`✅ Compte admin créé : ${ADMIN_USERNAME}`);
+        console.log(`🔑 Mot de passe généré (à changer ensuite) : ${generated}`);
+        console.log('========================================');
+      } else {
+        console.log(`✅ Compte admin créé : ${ADMIN_USERNAME} (mot de passe défini via ADMIN_PASSWORD)`);
+      }
+    }
+    console.log('✅ Base de données initialisée');
   } catch(e) {
     console.error('[INIT-DB]', e.message);
   }
@@ -349,11 +366,20 @@ async function getExchangeRates() {
 // ─── MIDDLEWARE ───────────────────────────────────────────────────────────
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+const SESSION_COOKIE_NAME = 'sk.sid';
+app.set('trust proxy', 1); // Render est derrière un proxy HTTPS
 app.use(session({
+  store: new pgSession({ pool, tableName: 'user_sessions', createTableIfMissing: true }),
+  name: SESSION_COOKIE_NAME,
   secret: process.env.SESSION_SECRET || 'sk_sossou2026_xK9mP2qLvR8nTwYjZdAcBe',
   resave: false,
   saveUninitialized: false,
-  cookie: { secure: false, maxAge: 24 * 60 * 60 * 1000 }
+  rolling: true,
+  cookie: {
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    maxAge: 24 * 60 * 60 * 1000
+  }
 }));
 app.use((req, res, next) => {
   res.header("Access-Control-Allow-Origin", "*");
@@ -385,6 +411,16 @@ async function requireAdmin(req, res, next) {
 }
 
 // ─── STATIC FILES ─────────────────────────────────────────────────────────
+// Empêche le navigateur de garder en cache (bfcache / back-forward) les
+// pages nécessitant une session : sans ça, après une déconnexion, un
+// retour arrière du navigateur peut réafficher la page telle qu'elle
+// était encore "connectée" avant que le script de vérification de
+// session n'ait le temps de rediriger.
+app.use(["/dashboard.html", "/admin.html"], (req, res, next) => {
+  res.set("Cache-Control", "no-store, no-cache, must-revalidate, private");
+  res.set("Pragma", "no-cache");
+  next();
+});
 app.use(express.static(__dirname));
 
 // ─── ROUTE: Racine → login ─────────────────────────────────────────────────
@@ -433,18 +469,73 @@ app.post("/api/login", async (req, res) => {
 
 // ─── ROUTE: Déconnexion ───────────────────────────────────────────────────
 app.post("/api/logout", (req, res) => {
-  req.session.destroy(() => res.json({ success: true }));
+  req.session.destroy((err) => {
+    // Toujours effacer le cookie côté navigateur, même si la session
+    // avait déjà expiré / n'existait plus côté serveur.
+    res.clearCookie(SESSION_COOKIE_NAME, { path: "/" });
+    if (err) {
+      console.error("[LOGOUT]", err.message);
+      return res.status(500).json({ error: "Erreur lors de la déconnexion" });
+    }
+    res.json({ success: true });
+  });
 });
 
-// ─── ROUTE: Inscription désactivée — uniquement via bot Telegram ──────────
-// L'inscription se fait exclusivement dans le chat privé du bot Telegram.
-app.post("/api/register", (req, res) => {
-  res.status(403).json({ error: "L'inscription se fait uniquement via le bot Telegram." });
+// ─── ROUTE: Inscription via le site web ───────────────────────────────────
+// En plus de l'inscription via le bot Telegram, un utilisateur peut créer
+// un compte directement sur le site (lien configurable par l'admin).
+app.post("/api/register", async (req, res) => {
+  try {
+    let { username, password, confirm_password, first_name, last_name, email, promo_code } = req.body || {};
+    username = (username || "").trim().toLowerCase().replace(/\s+/g, "");
+    password = password || "";
+    first_name = (first_name || "").trim();
+    last_name  = (last_name  || "").trim();
+    email      = (email || "").trim() || null;
+    promo_code = (promo_code || "").trim().toUpperCase() || null;
+
+    if (username.length < 3)
+      return res.status(400).json({ error: "Identifiant trop court (min. 3 caractères)." });
+    if (!/^[a-z0-9_.]+$/.test(username))
+      return res.status(400).json({ error: "Identifiant invalide (lettres, chiffres, . et _ uniquement)." });
+    if (password.length < 6)
+      return res.status(400).json({ error: "Mot de passe trop court (min. 6 caractères)." });
+    if (confirm_password !== undefined && confirm_password !== password)
+      return res.status(400).json({ error: "Les mots de passe ne correspondent pas." });
+
+    const exists = await pool.query(
+      "SELECT id FROM users WHERE username=$1 OR (email IS NOT NULL AND email=$2)",
+      [username, email]
+    );
+    if (exists.rows.length)
+      return res.status(409).json({ error: "Cet identifiant (ou email) est déjà utilisé." });
+
+    const hash = await bcrypt.hash(password, 10);
+    const ins = await pool.query(
+      `INSERT INTO users(username, email, first_name, last_name, password_hash, plain_password, account_type, promo_code, is_approved)
+       VALUES($1,$2,$3,$4,$5,$6,'Standard',$7,TRUE)
+       RETURNING id, username`,
+      [username, email, first_name || null, last_name || null, hash, password, promo_code]
+    );
+
+    req.session.userId   = ins.rows[0].id;
+    req.session.username = ins.rows[0].username;
+    await pool.query("UPDATE users SET last_seen = NOW() WHERE id = $1", [ins.rows[0].id]);
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error("[REGISTER]", err.message);
+    res.status(500).json({ error: "Erreur serveur lors de l'inscription." });
+  }
 });
 
 // ─── ROUTE: Config publique (bot username) ────────────────────────────────
-app.get("/api/config", (req, res) => {
-  res.json({ bot_username: BOT_USERNAME });
+app.get("/api/config", async (req, res) => {
+  const inscUrl = await pool.query("SELECT value FROM settings WHERE key='inscription_url'").catch(() => ({ rows: [] }));
+  res.json({
+    bot_username: BOT_USERNAME,
+    inscription_url: inscUrl.rows[0]?.value || ""
+  });
 });
 
 // ─── ROUTES ADMIN (espace web admin) ─────────────────────────────────────
@@ -1708,6 +1799,75 @@ app.get("/api/admin/users", requireAdmin, async (req, res) => {
   }
 });
 
+// ─── ADMIN: Vue par membre (canal + stratégies + temps restant) ──────────
+app.get("/api/admin/members-overview", requireAdmin, async (req, res) => {
+  try {
+    // 1. Config stratégies → map channel_id -> [ {id,name}, ... ]
+    const stratRes = await pool.query("SELECT value FROM settings WHERE key='strategies_config'");
+    let strategies = [];
+    if (stratRes.rows.length > 0) {
+      try { strategies = JSON.parse(stratRes.rows[0].value); } catch {}
+    }
+    const channelStrats = {}; // channel_id -> [{id,name}]
+    for (const s of strategies) {
+      for (const t of (s.tg_targets || [])) {
+        if (!t.channel_id) continue;
+        if (!channelStrats[t.channel_id]) channelStrats[t.channel_id] = [];
+        channelStrats[t.channel_id].push({ id: s.id, name: s.name, enabled: !!s.enabled });
+      }
+    }
+
+    // 2. Noms de canaux
+    const chans = await pool.query("SELECT channel_id, channel_name FROM telegram_config");
+    const chanMap = {};
+    for (const row of chans.rows) chanMap[row.channel_id] = row.channel_name || '';
+
+    // 3. Chaque accès membre (essai ou lié) par canal, enrichi du compte utilisateur s'il existe
+    const rows = await pool.query(`
+      SELECT cta.telegram_id, cta.channel_id, cta.tg_username, cta.tg_first_name,
+             cta.granted_at, cta.expires_at AS trial_expires_at, cta.kicked,
+             u.id AS user_id, u.username AS account_username, u.first_name AS account_first_name,
+             u.subscription_expires_at, u.is_premium, u.is_pro, u.account_type
+      FROM channel_temp_access cta
+      LEFT JOIN users u ON u.telegram_id = cta.telegram_id::text
+      ORDER BY cta.expires_at DESC
+    `);
+
+    const now = new Date();
+    const members = rows.rows.map(m => {
+      const subExp   = m.subscription_expires_at ? new Date(m.subscription_expires_at) : null;
+      const trialExp = m.trial_expires_at ? new Date(m.trial_expires_at) : null;
+      // Temps restant effectif = le plus tardif entre abonnement payant et essai gratuit
+      const effectiveExp = (subExp && (!trialExp || subExp > trialExp)) ? subExp : trialExp;
+      const remaining_ms = effectiveExp ? Math.max(0, effectiveExp - now) : 0;
+      const is_active = !!(effectiveExp && effectiveExp > now) && !m.kicked;
+      return {
+        telegram_id: m.telegram_id,
+        username: m.account_username || m.tg_username || null,
+        first_name: m.account_first_name || m.tg_first_name || null,
+        linked: !!m.user_id,
+        channel_id: m.channel_id,
+        channel_name: chanMap[m.channel_id] || '',
+        strategies: channelStrats[m.channel_id] || [],
+        account_type: m.account_type || null,
+        is_premium: !!m.is_premium,
+        is_pro: !!m.is_pro,
+        subscription_expires_at: m.subscription_expires_at,
+        trial_expires_at: m.trial_expires_at,
+        effective_expires_at: effectiveExp,
+        remaining_ms,
+        kicked: !!m.kicked,
+        is_active,
+      };
+    });
+
+    res.json({ members });
+  } catch (e) {
+    console.error("[ADMIN-MEMBERS-OVERVIEW]", e);
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
+
 // ─── CHARGEMENT DU FICHIER DE CONFIG STRATÉGIES ──────────────────────────
 let STRATEGIES_CONFIG = null;
 try {
@@ -1815,7 +1975,7 @@ async function seedStrategiesConfig() {
 const TelegramBot = require('node-telegram-bot-api').default || require('node-telegram-bot-api');
 
 const BOT_TOKEN   = process.env.TELEGRAM_BOT_TOKEN || '';
-const ADMIN_TG_ID = 1190237801;
+const ADMIN_TG_ID = process.env.ADMIN_TG_ID || '1190237801';
 
 // Le bot n'est créé que si le token est fourni
 let bot = null;
@@ -1831,6 +1991,9 @@ if (!BOT_TOKEN) {
 
   // Récupérer le username du bot au démarrage
   bot.getMe().then(info => { BOT_USERNAME = info.username || ''; console.log('[TG-BOT] Username:', BOT_USERNAME); }).catch(() => {});
+
+  // Initialiser le module userbot (scan des membres existants — voir telegram-userbot.js)
+  initUserbot().catch(e => console.error('[USERBOT-INIT-ERR]', e.message));
 
   // Arrêt propre à la fermeture du processus
   process.once('SIGTERM', () => { bot.stopPolling().catch(()=>{}); setTimeout(()=>process.exit(0), 500); });
@@ -2317,48 +2480,111 @@ async function kickExpiredUsers(notifyAdmin=false) {
 // Vérification toutes les 5 minutes
 setInterval(()=>kickExpiredUsers(true), 5*60*1000);
 
-// ── Nouveaux membres dans le canal : 5h gratuites automatiques ────────────
-const FREE_HOURS_NEW_MEMBER = 5; // durée gratuite accordée à tout nouveau membre
+// ── Octroi / refus d'essai gratuit pour un membre sur un canal donné ───────
+// Réutilisée pour : arrivée d'un nouveau membre (new_chat_members) ET pour le
+// bouton "🎁 Activer mon essai 24h" diffusé aux membres déjà présents lors de
+// l'ajout du bot (voir my_chat_member plus bas).
+async function grantOrDenyTrial(channel, tgUser) {
+  const trialDays = (channel.default_duration_days && channel.default_duration_days>0)
+    ? channel.default_duration_days : DEFAULT_TRIAL_DAYS;
+  const trialLabel = trialDays===1 ? '24h' : `${trialDays} jour(s)`;
+
+  await trackVisitor(tgUser.id, tgUser.username, tgUser.first_name);
+  const prenom = esc(tgUser.first_name||tgUser.username||'');
+  const linked = await getLinkedUser(tgUser.id);
+  const now = new Date();
+  const hasActiveSub = linked?.subscription_expires_at && new Date(linked.subscription_expires_at) > now;
+
+  if (hasActiveSub) return { status:'already_active' };
+
+  const prevRes = await pool.query(
+    "SELECT expires_at, kicked FROM channel_temp_access WHERE telegram_id=$1 AND channel_id=$2",
+    [tgUser.id, String(channel.channel_id)]
+  ).catch(()=>({rows:[]}));
+  const prev = prevRes.rows[0];
+  const trialAlreadyUsed = prev && (prev.kicked===true || new Date(prev.expires_at) < now);
+
+  if (trialAlreadyUsed) {
+    await bot.sendMessage(tgUser.id,
+      `⛔ *Votre période d'essai est terminée.*\n\n`+
+      `Vous avez déjà bénéficié de votre accès gratuit à *${esc(channel.channel_name||'ce canal')}*.\n`+
+      `Pour rejoindre à nouveau, merci de passer à un abonnement :`,
+      { parse_mode:'Markdown', reply_markup:{ inline_keyboard:[
+        [{ text:'💳 S\'abonner maintenant', url:`${SITE_URL}/payment.html` }],
+        [{ text:'🔐 Se connecter au bot',  callback_data:'action_connexion'  }]
+      ]}}).catch(()=>{});
+
+    await bot.banChatMember(channel.channel_id, tgUser.id).catch(()=>{});
+    await bot.unbanChatMember(channel.channel_id, tgUser.id).catch(()=>{});
+    await pool.query(
+      "UPDATE channel_temp_access SET kicked=TRUE WHERE telegram_id=$1 AND channel_id=$2",
+      [tgUser.id, String(channel.channel_id)]
+    ).catch(()=>{});
+
+    if (ADMIN_TG_ID) {
+      await bot.sendMessage(ADMIN_TG_ID,
+        `🔁⛔ *Retour refusé — essai déjà utilisé*\n\n`+
+        `👤 ${prenom}${tgUser.username?` (@${esc(tgUser.username)})`:''}\n`+
+        `🆔 \`${tgUser.id}\`\n`+
+        `📡 Canal : ${esc(channel.channel_name||'')}\n\n`+
+        `Retiré automatiquement et invité à s'abonner.`,
+        { parse_mode:'Markdown' }
+      ).catch(()=>{});
+    }
+    return { status:'denied' };
+  }
+
+  const exp = new Date(Date.now() + trialDays*24*60*60*1000);
+
+  if (linked) {
+    await pool.query(
+      `UPDATE users SET subscription_expires_at=$1,is_premium=true
+       WHERE id=$2 AND (subscription_expires_at IS NULL OR subscription_expires_at<NOW())`,
+      [exp, linked.id]
+    ).catch(()=>{});
+  }
+
+  await pool.query(
+    `INSERT INTO channel_temp_access(telegram_id,channel_id,tg_username,tg_first_name,expires_at)
+     VALUES($1,$2,$3,$4,$5)
+     ON CONFLICT(telegram_id) DO UPDATE SET expires_at=$5,kicked=FALSE,granted_at=NOW()`,
+    [tgUser.id, String(channel.channel_id), tgUser.username||null, tgUser.first_name||null, exp]
+  ).catch(()=>{});
+
+  await bot.sendMessage(tgUser.id,
+    `👋 Bienvenue *${prenom}* dans *${esc(channel.channel_name||'le canal')}* !\n\n`+
+    `🎁 *${trialLabel} gratuit(es)* vous sont accordées.\n`+
+    `⏰ Accès jusqu'à *${fmtDate(exp)}*\n\n`+
+    `⚠️ Après expiration, vous serez retiré automatiquement du canal.\n`+
+    `Finalisez votre paiement pour continuer :`,
+    { parse_mode:'Markdown', reply_markup:{ inline_keyboard:[
+      [{ text:'💳 Souscrire maintenant', url:`${SITE_URL}/payment.html` }],
+      [{ text:'🔐 Se connecter au bot',  callback_data:'action_connexion'  }],
+      [{ text:"📝 Créer un compte",      callback_data:'action_inscription'}]
+    ]}}).catch(()=>{});
+
+  if (ADMIN_TG_ID) {
+    await bot.sendMessage(ADMIN_TG_ID,
+      `🆕 *Essai activé — ${esc(channel.channel_name||'le canal')}*\n\n`+
+      `👤 ${prenom}${tgUser.username?` (@${esc(tgUser.username)})`:''}\n`+
+      `🆔 \`${tgUser.id}\`\n`+
+      `${linked?`🔗 Compte lié : *${esc(linked.username)}*`:'⚠️ Compte non lié'}\n`+
+      `🎁 ${trialLabel} accordé(es), expire le ${fmtDate(exp)}`,
+      { parse_mode:'Markdown' }
+    ).catch(()=>{});
+  }
+  return { status:'granted', exp };
+}
+
+// ── Nouveaux membres dans le canal : essai gratuit automatique ────────────
+const DEFAULT_TRIAL_DAYS = 1; // 24h par défaut si l'admin n'a pas configuré de durée pour ce canal
 
 bot.on('new_chat_members', async (msg) => {
   const channel=await getActiveChannel();
   if (!channel||String(msg.chat.id)!==String(channel.channel_id)) return;
   for (const m of msg.new_chat_members) {
     if (m.is_bot) continue;
-    await trackVisitor(m.id,m.username,m.first_name);
-    const expMs = Date.now() + FREE_HOURS_NEW_MEMBER*60*60*1000;
-    const exp   = new Date(expMs);
-    const linked = await getLinkedUser(m.id);
-
-    if (linked) {
-      // Membre lié → mettre à jour son abonnement si pas déjà actif
-      await pool.query(
-        `UPDATE users SET subscription_expires_at=$1,is_premium=true
-         WHERE id=$2 AND (subscription_expires_at IS NULL OR subscription_expires_at<NOW())`,
-        [exp, linked.id]
-      ).catch(()=>{});
-    }
-
-    // Toujours enregistrer dans channel_temp_access (permet le kick même si non lié)
-    await pool.query(
-      `INSERT INTO channel_temp_access(telegram_id,channel_id,tg_username,tg_first_name,expires_at)
-       VALUES($1,$2,$3,$4,$5)
-       ON CONFLICT(telegram_id) DO UPDATE SET expires_at=$5,kicked=FALSE,granted_at=NOW()`,
-      [m.id, String(channel.channel_id), m.username||null, m.first_name||null, exp]
-    ).catch(()=>{});
-
-    const prenom = esc(m.first_name||m.username||'');
-    await bot.sendMessage(m.id,
-      `👋 Bienvenue *${prenom}* dans *${esc(channel.channel_name||'le canal')}* !\n\n`+
-      `🎁 *${FREE_HOURS_NEW_MEMBER}h gratuites* vous sont accordées.\n`+
-      `⏰ Accès jusqu'à *${fmtDate(exp)}*\n\n`+
-      `⚠️ Après expiration, vous serez retiré automatiquement.\n`+
-      `Finalisez votre paiement pour continuer :`,
-      { parse_mode:'Markdown', reply_markup:{ inline_keyboard:[
-        [{ text:'💳 Souscrire maintenant', url:`${SITE_URL}/payment.html` }],
-        [{ text:'🔐 Se connecter au bot',  callback_data:'action_connexion'  }],
-        [{ text:"📝 Créer un compte",      callback_data:'action_inscription'}]
-      ]}}).catch(()=>{});
+    await grantOrDenyTrial(channel, { id:m.id, username:m.username, first_name:m.first_name });
   }
 });
 
@@ -2366,16 +2592,42 @@ bot.on('new_chat_members', async (msg) => {
 // ── Tracker les membres via chat_member updates ─────────────────────────────
 bot.on('chat_member', async (update) => {
   const member=update.new_chat_member;
+  const oldMember=update.old_chat_member;
   if (!member||member.user?.is_bot) return;
   const chat=update.chat;
   const channel=await getActiveChannel();
   if (!channel||String(chat.id)!==String(channel.channel_id)) return;
   const u=member.user;
-  await trackVisitor(u.id, u.username, u.first_name);
-  // Si le membre vient de rejoindre, lui envoyer un message de bienvenue
-  if (member.status==='member'||member.status==='restricted') {
+  const wasIn  = ['member','administrator','creator','restricted'].includes(oldMember?.status);
+  const nowIn  = ['member','administrator','creator','restricted'].includes(member.status);
+
+  // ── Un membre vient de rejoindre le canal ──
+  if (nowIn && !wasIn) {
+    await trackVisitor(u.id, u.username, u.first_name);
+    const name = esc([u.first_name,u.last_name].filter(Boolean).join(' ')||u.username||String(u.id));
+    // Message de bienvenue au membre
     await bot.sendMessage(u.id,
       `👋 Bienvenue dans *${esc(chat.title||'')}* !\n\nConnectez-vous ou créez un compte pour gérer votre abonnement.\n\nTapez /start`,
+      {parse_mode:'Markdown'}
+    ).catch(()=>{});
+    // Notification à l'admin
+    if (ADMIN_TG_ID) {
+      const linked = await getLinkedUser(u.id);
+      await bot.sendMessage(ADMIN_TG_ID,
+        `🆕 *Nouveau membre dans ${esc(chat.title||channel.channel_name||'')}*\n\n`+
+        `👤 ${name}${u.username?` (@${esc(u.username)})`:''}\n`+
+        `🆔 \`${u.id}\`\n`+
+        `${linked?`🔗 Compte lié : *${esc(linked.username)}*`:'⚠️ Compte non lié — DM de bienvenue envoyé'}`,
+        {parse_mode:'Markdown'}
+      ).catch(()=>{});
+    }
+  }
+
+  // ── Un membre a quitté / a été retiré du canal ──
+  if (!nowIn && wasIn && ADMIN_TG_ID) {
+    const name = esc([u.first_name,u.last_name].filter(Boolean).join(' ')||u.username||String(u.id));
+    await bot.sendMessage(ADMIN_TG_ID,
+      `🚪 *Membre parti : ${esc(chat.title||channel.channel_name||'')}*\n\n👤 ${name}${u.username?` (@${esc(u.username)})`:''}\n🆔 \`${u.id}\``,
       {parse_mode:'Markdown'}
     ).catch(()=>{});
   }
@@ -2412,6 +2664,31 @@ bot.on('my_chat_member', async (update) => {
         tracked++;
       }
 
+      // ── Scan automatique des membres EXISTANTS via le userbot (si configuré) ──
+      // Un bot à token ne peut jamais lister les membres existants (limite Telegram).
+      // Si TG_API_ID / TG_API_HASH / TG_SESSION sont configurés (voir telegram-userbot.js
+      // et generate-session.js), un vrai compte Telegram scanne le canal et attribue
+      // automatiquement l'essai à chaque membre déjà présent.
+      let userbotResult = null;
+      if (isUserbotReady()) {
+        const channelRow = await getActiveChannel();
+        userbotResult = await scanExistingMembers(String(chat.id), (tgUser) => grantOrDenyTrial(channelRow, tgUser));
+      }
+
+      // ── Fallback : bouton d'activation manuelle diffusé dans le canal ─────
+      // Utilisé uniquement si le userbot n'est pas configuré ou a échoué —
+      // c'est la seule autre voie techniquement possible côté Telegram.
+      if (!userbotResult?.ok && BOT_USERNAME) {
+        await bot.sendMessage(chat.id,
+          `🎁 *Essai gratuit disponible !*\n\n`+
+          `Les membres de ce canal peuvent activer *24h d'accès gratuit* en tapant sur le bouton ci-dessous.\n`+
+          `⚠️ Après expiration, un abonnement sera nécessaire pour continuer.`,
+          { parse_mode:'Markdown', reply_markup:{ inline_keyboard:[
+            [{ text:'🎁 Activer mon essai 24h', url:`https://t.me/${BOT_USERNAME}?start=trial_${chat.id}` }]
+          ]}}
+        ).catch(()=>{});
+      }
+
       // Préparer session admin pour demande de durée
       tgSessions.set(ADMIN_TG_ID,{
         step:'canal_duration_confirm',
@@ -2424,11 +2701,14 @@ bot.on('my_chat_member', async (update) => {
         `📡 *Bot ajouté au canal !*\n\n`+
         `• Canal : *${esc(chat.title||String(chat.id))}*\n`+
         `• Membres totaux : *${count}*\n`+
-        `• Admins scannés et trackés : *${tracked}*\n\n`+
+        `• Admins scannés et trackés : *${tracked}*\n`+
+        `${userbotResult?.ok
+          ? `• 🔎 Scan userbot : *${userbotResult.scanned}* membre(s) scanné(s), *${userbotResult.granted}* essai(s) 24h accordé(s)\n`
+          : `• ⚠️ Scan automatique complet non disponible (userbot non configuré) — bouton d'activation manuelle diffusé dans le canal\n`}\n`+
         `✅ Les administrateurs existants ont été trackés et invités.\n`+
         `Les membres réguliers seront automatiquement capturés dès qu\'ils interagissent dans le canal.\n\n`+
-        `Voulez-vous accorder une durée d\'abonnement automatique aux membres ?\n\n`+
-        `Répondez avec le nombre de jours (ex: \`30\`) ou tapez \`NON\` pour ignorer.`,
+        `🎁 Par défaut, chaque nouveau membre reçoit *24h d\'essai gratuit*, puis est retiré automatiquement s\'il ne s\'abonne pas.\n\n`+
+        `Voulez-vous changer cette durée d\'essai ? Répondez avec le nombre de jours (ex: \`30\`) ou tapez \`NON\` pour garder 24h.`,
         {parse_mode:'Markdown'}
       );
     } catch(e) { console.error('[TG-MYCHAT-ADD]',e.message); }
@@ -2445,8 +2725,22 @@ bot.on('my_chat_member', async (update) => {
 });
 
 // ── /start ─────────────────────────────────────────────────────────────────
-bot.onText(/\/start/, async (msg) => {
+bot.onText(/\/start(?:\s+(.+))?/, async (msg, match) => {
   const chatId=msg.chat.id;
+  const payload=(match && match[1]||'').trim();
+
+  // ── Deep-link "🎁 Activer mon essai 24h" tapé depuis le canal ──────────
+  if (payload.startsWith('trial_')) {
+    const channelId = payload.slice('trial_'.length);
+    const channel = await pool.query(
+      "SELECT * FROM telegram_config WHERE channel_id=$1", [channelId]
+    ).then(r=>r.rows[0]).catch(()=>null);
+    if (channel) {
+      await grantOrDenyTrial(channel, { id:chatId, username:msg.from?.username, first_name:msg.from?.first_name });
+      return;
+    }
+  }
+
   tgSessions.delete(chatId);
   const linked=await getLinkedUser(chatId);
   if (linked) {
@@ -2887,7 +3181,7 @@ bot.on('message', async (msg) => {
   if (_isAdmin && sess.step==='canal_duration_confirm') {
     if (text.toUpperCase()==='NON') {
       tgSessions.delete(chatId);
-      bot.sendMessage(chatId,'❌ Aucune durée automatique configurée.',SEND_OPT(KB_ADMIN_MENU)); return;
+      bot.sendMessage(chatId,'✅ Durée d\'essai conservée : 24h par défaut pour les nouveaux membres.',SEND_OPT(KB_ADMIN_MENU)); return;
     }
     const days=parseInt(text,10);
     if (isNaN(days)||days<=0) {
