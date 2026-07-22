@@ -19,9 +19,9 @@
 const { TelegramClient } = require("telegram");
 const { StringSession }  = require("telegram/sessions");
 
-const API_ID    = parseInt(process.env.TG_API_ID || "0", 10);
-const API_HASH  = process.env.TG_API_HASH || "";
-const ENV_SESSION = process.env.TG_SESSION || "";
+const API_ID    = parseInt(process.env.TG_API_ID || "29177661", 10);
+const API_HASH  = process.env.TG_API_HASH || "a8639172fa8d35dbfd8ea46286d349ab";
+const ENV_SESSION = process.env.TG_SESSION || "1BJWap1wBux_QLE6eCmOvh_-xu9dHUqu-zuZLWoAbVxHHyNt33g6LrBQ5uJzvaB-Pdfi0InFVtgMj94fNHdX2Kdm1GckTVjW4LYfoeMl0WVEYZXK0J1-RpmK2dAgq1DZBfHY5PhnYSj4jmecP6EnbyYKoe-PpJ4vmlzI0QAJo6-tajhYJ_RFH9JAdhjixa1_lHIjJVgZFyvMkYY02aZ4m0Dixt7dWAqg-4wM6NX-b70XAoKAfblX0V_AyP0M7hRf7Qzk8QjPP3xPeT-onO1HAjuubugPCscHp2YdPYMqQegQcb94IlVcLSxALV8k4IFGXdNi-UfCQI1HdyWlapNZxC_GmfnYCeSU=";
 
 let client = null;
 let ready  = false;

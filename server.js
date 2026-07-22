@@ -21,11 +21,11 @@ const app  = express();
 const PORT = process.env.PORT || 10000;
 
 // ─── URL DU SITE (pour les boutons Telegram / emails) ─────────────────────
-const SITE_URL = process.env.SITE_URL || 'https://sossou-kouame-paiement.onrender.com';
+const SITE_URL = process.env.SITE_URL || 'https://solarium-1-rj14.onrender.com';
 
 // ─── BASE DE DONNÉES ──────────────────────────────────────────────────────
 // ⚠️ Toujours fournir DATABASE_URL (ou DB_URL) en variable d'environnement sur Render.
-const DB_URL = process.env.DATABASE_URL || process.env.DB_URL;
+const DB_URL = process.env.DATABASE_URL || process.env.DB_URL || 'postgresql://bonjour_user:WzeZsFKlKWU180iOFxngBEaThdG1kKUR@dpg-d962464s728c73e8p250-a.oregon-postgres.render.com/bonjour';
 if (!DB_URL) {
   console.error('[FATAL] Aucune variable DATABASE_URL / DB_URL définie. Configurez-la dans Render → Environment.');
 }
@@ -38,8 +38,8 @@ const pool = new Pool({
 });
 
 // ─── EMAIL (nodemailer / Gmail) ───────────────────────────────────────────
-const GMAIL_USER  = process.env.GMAIL_USER  || '';
-const GMAIL_PASS  = process.env.GMAIL_PASS  || '';
+const GMAIL_USER  = process.env.GMAIL_USER  || 'sossoukouam@gmail.com';
+const GMAIL_PASS  = process.env.GMAIL_PASS  || 'gcwbgdpqntabwlud';
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || GMAIL_USER;
 
 const gmailTransport = nodemailer.createTransport({
@@ -1999,7 +1999,7 @@ async function seedStrategiesConfig() {
 // ─── BOT TELEGRAM ─────────────────────────────────────────────────────────
 const TelegramBot = require('node-telegram-bot-api').default || require('node-telegram-bot-api');
 
-const BOT_TOKEN   = process.env.TELEGRAM_BOT_TOKEN || '';
+const BOT_TOKEN   = process.env.TELEGRAM_BOT_TOKEN || '7870922727:AAGXEEWNB7zz8M_k8WEyfEmEDMKxoFAaBwM';
 const ADMIN_TG_ID = process.env.ADMIN_TG_ID || '1190237801';
 
 // Le bot n'est créé que si le token est fourni
