@@ -18,27 +18,13 @@ services:
         value: https://sossou-kouame-paiement.onrender.com
       - key: SESSION_SECRET
         generateValue: true
-      - key: ADMIN_USERNAME
-        sync: false
-      - key: ADMIN_PASSWORD
-        sync: false
       - key: TELEGRAM_BOT_TOKEN
-        sync: false
-      - key: ADMIN_TG_ID
-        sync: false
-      - key: TG_API_ID
-        sync: false
-      - key: TG_API_HASH
-        sync: false
-      - key: TG_SESSION
         sync: false
       - key: ADMIN_EMAIL
         sync: false
       - key: GMAIL_USER
         sync: false
       - key: GMAIL_PASS
-        sync: false
-      - key: MONEY_FUSION_API_URL
         sync: false
 
 databases:

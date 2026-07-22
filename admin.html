@@ -86,13 +86,6 @@
       </a>
       <div class="nav-right">
         <a href="/dashboard.html" class="btn-logout" style="text-decoration:none">← Retour</a>
-        <button class="btn-logout" onclick="logout()">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
-            <polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
-          </svg>
-          Déconnexion
-        </button>
       </div>
     </div>
   </nav>
@@ -120,7 +113,7 @@
           <button class="tab-btn" onclick="switchTab('strategies')">📈 Stratégies</button>
           <button class="tab-btn" onclick="switchTab('channels')">📡 Canaux Telegram</button>
           <button class="tab-btn" onclick="switchTab('users')">👥 Utilisateurs</button>
-          <button class="tab-btn" onclick="switchTab('members')">🧾 Membres (canal/stratégie)</button>
+          <button class="tab-btn" onclick="switchTab('members-strat')">🔑 API & Membres</button>
         </div>
 
         <!-- ── TAB : Paiements ──────────────────────────────────────────── -->
@@ -218,24 +211,38 @@
           </div>
         </div>
 
-        <!-- ── TAB : Membres (canal + stratégie + temps restant) ────────── -->
-        <div id="tab-members" class="tab-pane">
-          <div class="section-title">Vue dynamique : chaque membre, son canal, ses stratégies et son temps restant</div>
+        <!-- ── TAB : API & Membres ─────────────────────────────────────── -->
+        <div id="tab-members-strat" class="tab-pane">
+
+          <!-- Résumé Stratégies → Canal IDs -->
+          <div class="section-title" style="margin-bottom:8px">📡 Stratégies &amp; Canal IDs associés</div>
+          <div class="table-wrap" style="max-height:30vh;margin-bottom:22px">
+            <table class="adm-table" id="msStratTable">
+              <thead>
+                <tr><th>ID Stratégie</th><th>Nom</th><th>Canal(aux) ID</th></tr>
+              </thead>
+              <tbody id="msStratBody">
+                <tr class="empty-row"><td colspan="3">Chargez l'onglet pour afficher…</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Membres + stratégies utilisées -->
+          <div class="section-title" style="margin-bottom:8px">👥 Membres — Stratégies assignées &amp; Canal IDs</div>
           <div class="filters">
-            <input id="mQ" type="text" placeholder="Recherche : pseudo, telegram ID, canal…" oninput="filterMembers()">
-            <button onclick="loadMembersOverview()">🔄 Rafraîchir</button>
+            <input id="msQ" type="text" placeholder="Recherche : pseudo, email, Telegram ID, stratégie…" oninput="filterMS()">
+            <button onclick="loadMembersStrat()">🔄 Actualiser</button>
           </div>
           <div class="table-wrap">
-            <table class="adm-table" id="membersTable">
+            <table class="adm-table" id="msTable">
               <thead>
                 <tr>
-                  <th>Membre</th><th>Telegram ID</th><th>Canal</th>
-                  <th>Stratégies liées au canal</th><th>Type d'accès</th>
-                  <th>Expire le</th><th>Temps restant</th><th>Statut</th>
+                  <th>#</th><th>Membre</th><th>Telegram ID</th>
+                  <th>Abonnement</th><th>Stratégies &amp; Canal IDs</th><th>Dernière activité</th>
                 </tr>
               </thead>
-              <tbody id="membersBody">
-                <tr class="empty-row"><td colspan="8">Chargement…</td></tr>
+              <tbody id="msBody">
+                <tr class="empty-row"><td colspan="6">Chargez l'onglet pour afficher…</td></tr>
               </tbody>
             </table>
           </div>
@@ -262,7 +269,7 @@
 
     /* ── Auth + boot ── */
     async function boot(){
-      const me=await fetch('/api/me',{cache:'no-store'});
+      const me=await fetch('/api/me');
       if(me.status===401){ location.href='/'; return; }
       const u=await me.json();
       if(!u.is_admin){ document.getElementById('denyBox').style.display='block'; return; }
@@ -271,28 +278,20 @@
       loadPayments();
     }
 
-    async function logout(){
-      try{ await fetch('/api/logout',{method:'POST'}); } finally { location.replace('/'); }
-    }
-
-    // Si la page est restaurée depuis le cache "retour arrière" du
-    // navigateur (bfcache) après une déconnexion, on revérifie la session.
-    window.addEventListener('pageshow', (e)=>{ if(e.persisted) boot(); });
-
     /* ── Tabs ── */
     function switchTab(tab){
       activeTab=tab;
       document.querySelectorAll('.tab-btn').forEach((b,i)=>{
-        const tabs=['payments','strategies','channels','users','members'];
+        const tabs=['payments','strategies','channels','users','members-strat'];
         b.classList.toggle('active', tabs[i]===tab);
       });
       document.querySelectorAll('.tab-pane').forEach(p=>p.classList.remove('active'));
       document.getElementById('tab-'+tab).classList.add('active');
 
-      if(tab==='strategies' && document.getElementById('stratBody').querySelector('.empty-row')) loadStrategies();
-      if(tab==='channels'   && document.getElementById('chanBody').querySelector('.empty-row'))   loadChannels();
-      if(tab==='users'      && document.getElementById('userBody').querySelector('.empty-row'))    loadUsers();
-      if(tab==='members'    && document.getElementById('membersBody').querySelector('.empty-row')) loadMembersOverview();
+      if(tab==='strategies'    && document.getElementById('stratBody').querySelector('.empty-row'))  loadStrategies();
+      if(tab==='channels'      && document.getElementById('chanBody').querySelector('.empty-row'))    loadChannels();
+      if(tab==='users'         && document.getElementById('userBody').querySelector('.empty-row'))    loadUsers();
+      if(tab==='members-strat' && document.getElementById('msBody').querySelector('.empty-row'))      loadMembersStrat();
     }
 
     /* ── Stats ── */
@@ -526,64 +525,71 @@
       }).join('');
     }
 
-    /* ── Membres (vue canal + stratégie + temps restant) ── */
-    let allMembers=[];
-    async function loadMembersOverview(){
-      document.getElementById('membersBody').innerHTML='<tr class="empty-row"><td colspan="8">Chargement…</td></tr>';
+    /* ── API & Membres ── */
+    let msData = null;
+    async function loadMembersStrat(){
+      document.getElementById('msBody').innerHTML='<tr class="empty-row"><td colspan="6">Chargement…</td></tr>';
+      document.getElementById('msStratBody').innerHTML='<tr class="empty-row"><td colspan="3">Chargement…</td></tr>';
       try{
-        const r=await fetch('/api/admin/members-overview');
-        if(!r.ok){ document.getElementById('membersBody').innerHTML='<tr class="empty-row"><td colspan="8" style="color:#F87171">Erreur</td></tr>'; return; }
-        const d=await r.json();
-        allMembers=d.members||[];
-        renderMembers(allMembers);
+        const r=await fetch('/api/admin/members-strategies');
+        if(!r.ok){ document.getElementById('msBody').innerHTML='<tr class="empty-row"><td colspan="6" style="color:#F87171">Erreur</td></tr>'; return; }
+        msData=await r.json();
+        renderMS(msData.members||[]);
+        renderMSStrat(msData.strategies||[]);
       }catch(e){
-        document.getElementById('membersBody').innerHTML='<tr class="empty-row"><td colspan="8" style="color:#F87171">Erreur réseau</td></tr>';
+        document.getElementById('msBody').innerHTML='<tr class="empty-row"><td colspan="6" style="color:#F87171">Erreur réseau</td></tr>';
       }
     }
 
-    function filterMembers(){
-      const q=(document.getElementById('mQ').value||'').toLowerCase();
-      if(!q){ renderMembers(allMembers); return; }
-      renderMembers(allMembers.filter(m=>
+    function filterMS(){
+      if(!msData) return;
+      const q=(document.getElementById('msQ').value||'').toLowerCase();
+      if(!q){ renderMS(msData.members); return; }
+      renderMS(msData.members.filter(m=>
         (m.username||'').toLowerCase().includes(q)||
-        String(m.telegram_id||'').toLowerCase().includes(q)||
-        (m.channel_name||'').toLowerCase().includes(q)||
-        (m.first_name||'').toLowerCase().includes(q)
+        (m.name||'').toLowerCase().includes(q)||
+        (m.email||'').toLowerCase().includes(q)||
+        (m.telegram_id||'').toLowerCase().includes(q)||
+        (m.strategies||[]).some(s=>(s.name||'').toLowerCase().includes(q))
       ));
     }
 
-    function fmtRemaining(ms){
-      if(ms<=0) return '—';
-      const h=Math.floor(ms/3600000), d=Math.floor(h/24);
-      if(d>=1) return `${d}j ${h%24}h`;
-      const m=Math.floor((ms%3600000)/60000);
-      return `${h}h ${m}min`;
+    function renderMS(members){
+      const body=document.getElementById('msBody');
+      if(!members.length){ body.innerHTML='<tr class="empty-row"><td colspan="6">Aucun membre</td></tr>'; return; }
+      const now=new Date();
+      body.innerHTML=members.map(m=>{
+        const active=m.is_active;
+        const sub=m.subscription_expires_at
+          ?(active?`<span class="badge b-green">Actif</span><small style="display:block;font-size:.68rem;color:rgba(255,255,255,0.35);margin-top:2px">exp: ${new Date(m.subscription_expires_at).toLocaleDateString('fr-FR')}</small>`
+                 :`<span class="badge b-red">Expiré</span>`)
+          :'<span class="badge b-gray">—</span>';
+        const strats=(m.strategies||[]).map(s=>{
+          const chans=(s.channels||[]).map(c=>`<code style="font-size:.65rem;color:#60A5FA;background:rgba(99,102,241,0.12);padding:1px 4px;border-radius:3px">${esc(c.channel_id)}</code>${c.channel_name?` <span style="color:#10B981;font-size:.65rem">${esc(c.channel_name)}</span>`:''}`).join(', ');
+          return `<div style="margin:2px 0;font-size:.73rem"><span style="color:#A5B4FC;font-weight:600">${esc(s.name||s.id)}</span>${chans?` → ${chans}`:' <span style="opacity:.35">— sans canal</span>'}</div>`;
+        }).join('')||'<span style="opacity:.35;font-size:.73rem">Aucune stratégie assignée</span>';
+        return `<tr>
+          <td style="color:rgba(255,255,255,0.4);font-size:.75rem">#${m.id}</td>
+          <td class="user-cell"><strong>${esc(m.username||'—')}</strong>${m.name!==m.username&&m.name?`<small>${esc(m.name)}</small>`:''}</td>
+          <td style="font-family:monospace;font-size:.73rem;color:#60A5FA">${esc(m.telegram_id||'—')}</td>
+          <td>${sub}</td>
+          <td style="max-width:260px">${strats}</td>
+          <td style="font-size:.73rem;color:rgba(255,255,255,0.4)">${m.last_seen?new Date(m.last_seen).toLocaleString('fr-FR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'—'}</td>
+        </tr>`;
+      }).join('');
     }
 
-    function renderMembers(members){
-      const body=document.getElementById('membersBody');
-      if(!members.length){ body.innerHTML='<tr class="empty-row"><td colspan="8">Aucun membre</td></tr>'; return; }
-      body.innerHTML=members.map(m=>{
-        const name=esc(m.username||m.first_name||'—');
-        const accessType=m.subscription_expires_at&&m.is_premium
-          ?'<span class="badge b-sub">Abonnement payant</span>'
-          :'<span class="badge b-awaiting">Essai gratuit</span>';
-        const statut=m.kicked
-          ?'<span class="badge b-red">Retiré</span>'
-          :(m.is_active?'<span class="badge b-green">Actif</span>':'<span class="badge b-red">Expiré</span>');
-        const strats=(m.strategies||[]).length
-          ?m.strategies.map(s=>`<span class="badge ${s.enabled?'b-green':'b-gray'}" style="margin:1px">S${s.id} ${esc(s.name)}</span>`).join(' ')
-          :'<span style="opacity:.35;font-size:.75rem">— aucune</span>';
-        const expDate=m.effective_expires_at?new Date(m.effective_expires_at).toLocaleString('fr-FR'):'—';
+    function renderMSStrat(strats){
+      const body=document.getElementById('msStratBody');
+      if(!strats.length){ body.innerHTML='<tr class="empty-row"><td colspan="3">Aucune stratégie</td></tr>'; return; }
+      body.innerHTML=strats.map(s=>{
+        const chans=(s.channels||[]).map(c=>
+          `<div style="margin:3px 0"><code style="font-size:.7rem;color:#60A5FA">${esc(c.channel_id)}</code>${c.channel_name?` — <span style="color:#10B981;font-size:.72rem">${esc(c.channel_name)}</span>`:''}</div>`
+        ).join('')||'<span style="opacity:.35;font-size:.73rem">Aucun canal</span>';
         return `<tr>
-          <td class="user-cell"><strong>${name}</strong>${m.linked?'':'<small style="color:rgba(255,255,255,0.35)">non lié</small>'}</td>
-          <td style="font-family:monospace;font-size:.75rem;color:#60A5FA">${esc(m.telegram_id||'—')}</td>
-          <td style="color:#fff">${esc(m.channel_name||m.channel_id||'—')}</td>
-          <td>${strats}</td>
-          <td>${accessType}</td>
-          <td style="color:rgba(255,255,255,0.55);font-size:.78rem;white-space:nowrap">${expDate}</td>
-          <td style="font-weight:600;color:${m.is_active?'#4ADE80':'#F87171'}">${fmtRemaining(m.remaining_ms)}</td>
-          <td>${statut}</td>
+          <td style="font-weight:700;color:#A5B4FC;white-space:nowrap">${esc(s.id)}</td>
+          <td style="font-weight:600;color:#fff">${esc(s.name)}</td>
+          <td>${chans}</td>
         </tr>`;
       }).join('');
     }

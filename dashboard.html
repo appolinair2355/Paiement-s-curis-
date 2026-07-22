@@ -210,7 +210,7 @@
 
     async function load(){
       try {
-        const r=await fetch('/api/me',{cache:'no-store'});
+        const r=await fetch('/api/me');
         if(r.status===401){ window.location.href='/'; return; }
         user=await r.json();
         render(user);
@@ -218,10 +218,6 @@
         document.getElementById('dashContent').classList.remove('hidden');
       } catch { window.location.href='/'; }
     }
-
-    // Si la page revient depuis le cache "retour arrière" (bfcache) après
-    // une déconnexion, on revérifie immédiatement la session.
-    window.addEventListener('pageshow', (e)=>{ if(e.persisted) load(); });
 
     function render(u){
       document.getElementById('navUser').textContent = u.username;
@@ -279,7 +275,8 @@
     }
 
     async function logout(){
-      try{ await fetch('/api/logout',{method:'POST'}); } finally { location.replace('/'); }
+      await fetch('/api/logout',{method:'POST'});
+      window.location.href='/';
     }
 
     // ─── BOUTIQUE ──────────────────────────────────────────────────────
