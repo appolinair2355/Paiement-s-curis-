@@ -25,9 +25,9 @@ const SITE_URL = process.env.SITE_URL || 'https://solarium-1-rj14.onrender.com';
 
 // ─── BASE DE DONNÉES ──────────────────────────────────────────────────────
 // ⚠️ Toujours fournir DATABASE_URL (ou DB_URL) en variable d'environnement sur Render.
-const DB_URL = process.env.DATABASE_URL || process.env.DB_URL || 'postgresql://bonjour_user:WzeZsFKlKWU180iOFxngBEaThdG1kKUR@dpg-d962464s728c73e8p250-a.oregon-postgres.render.com/bonjour';
+const DB_URL = process.env.DATABASE_URL || process.env.DB_URL || '';
 if (!DB_URL) {
-  console.error('[FATAL] Aucune variable DATABASE_URL / DB_URL définie. Configurez-la dans Render → Environment.');
+  console.error('[FATAL] Aucune variable DATABASE_URL / DB_URL définie. Configurez-la dans Render → Environment → Variables.');
 }
 const pool = new Pool({
   connectionString: DB_URL,
@@ -38,8 +38,8 @@ const pool = new Pool({
 });
 
 // ─── EMAIL (nodemailer / Gmail) ───────────────────────────────────────────
-const GMAIL_USER  = process.env.GMAIL_USER  || 'sossoukouam@gmail.com';
-const GMAIL_PASS  = process.env.GMAIL_PASS  || 'gcwbgdpqntabwlud';
+const GMAIL_USER  = process.env.GMAIL_USER  || '';
+const GMAIL_PASS  = process.env.GMAIL_PASS  || '';
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || GMAIL_USER;
 
 const gmailTransport = nodemailer.createTransport({
@@ -409,7 +409,7 @@ app.set('trust proxy', 1); // Render est derrière un proxy HTTPS
 app.use(session({
   store: new pgSession({ pool, tableName: 'user_sessions', createTableIfMissing: false }),
   name: SESSION_COOKIE_NAME,
-  secret: process.env.SESSION_SECRET || 'sk_sossou2026_xK9mP2qLvR8nTwYjZdAcBe',
+  secret: process.env.SESSION_SECRET || 'changeme_please_set_SESSION_SECRET_env',
   resave: false,
   saveUninitialized: false,
   rolling: true,
@@ -2012,7 +2012,7 @@ async function seedStrategiesConfig() {
 // ─── BOT TELEGRAM ─────────────────────────────────────────────────────────
 const TelegramBot = require('node-telegram-bot-api').default || require('node-telegram-bot-api');
 
-const BOT_TOKEN   = process.env.TELEGRAM_BOT_TOKEN || '7870922727:AAGXEEWNB7zz8M_k8WEyfEmEDMKxoFAaBwM';
+const BOT_TOKEN   = process.env.TELEGRAM_BOT_TOKEN || '';
 const ADMIN_TG_ID = process.env.ADMIN_TG_ID || '1190237801';
 
 // Le bot n'est créé que si le token est fourni
