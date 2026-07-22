@@ -22,18 +22,7 @@ const PORT = process.env.PORT || 10000;
 
 // ─── URL DU SITE (pour les boutons Telegram / emails) ─────────────────────
 const SITE_URL = process.env.SITE_URL || 'https://solarium-1-rj14.onrender.com';
-
-// ─── TELEGRAM BOT ────────────────────────────────────────────────────────
-const TelegramBot = require("node-telegram-bot-api");
-const TELEGRAM_BOT_TOKEN = "8627302352:AAF21Vn4bhLXk7PVzjZzHME9fZeZoQa5C18"; // 🔥 remplace ici
-
-const bot = new TelegramBot(TELEGRAM_BOT_TOKEN, { polling: true });
-
-// Test simple
-bot.on("message", (msg) => {
-  const chatId = msg.chat.id;
-  bot.sendMessage(chatId, "👋 Bienvenue sur Sossou Kouamé Bot !");
-});
+(chatId, "👋 Bienvenue sur Sossou Kouamé Bot !");
 // ─── BASE DE DONNÉES ──────────────────────────────────────────────────────
 const DB_URL = 'postgresql://bonjour_user:WzeZsFKlKWU180iOFxngBEaThdG1kKUR@dpg-d962464s728c73e8p250-a.oregon-postgres.render.com/bonjour';
 const pool = new Pool({
