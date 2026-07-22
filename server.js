@@ -1,3 +1,5 @@
+require("dotenv").config();
+
 // ============================================================
 // SOSSOU KOUAMÉ — Serveur Express complet
 // Login + Dashboard + Paiement Money Fusion + Crypto + BDD Render
