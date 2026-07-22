@@ -11,13 +11,13 @@ const session    = require("express-session");
 const nodemailer = require("nodemailer");
 
 const app  = express();
-const PORT = process.env.PORT || 5000;
+const PORT = 10000;
 
 // ─── URL DU SITE (pour les boutons Telegram / emails) ─────────────────────
-const SITE_URL = process.env.SITE_URL || 'https://sossou-kouame-paiement.onrender.com';
+const SITE_URL = 'https://sossou-kouame-paiement.onrender.com';
 
 // ─── BASE DE DONNÉES ──────────────────────────────────────────────────────
-const DB_URL = process.env.DATABASE_URL;
+const DB_URL = 'postgresql://bonjour_user:WzeZsFKlKWU180iOFxngBEaThdG1kKUR@dpg-d962464s728c73e8p250-a.oregon-postgres.render.com/bonjour';
 const pool = new Pool({
   connectionString: DB_URL,
   ssl: { rejectUnauthorized: false },
@@ -27,9 +27,9 @@ const pool = new Pool({
 });
 
 // ─── EMAIL (nodemailer / Gmail) ───────────────────────────────────────────
-const GMAIL_USER  = process.env.GMAIL_USER  || '';
-const GMAIL_PASS  = process.env.GMAIL_PASS  || '';
-const ADMIN_EMAIL = process.env.ADMIN_EMAIL || '';
+const GMAIL_USER  = 'sossoukouam@gmail.com';
+const GMAIL_PASS  = 'gcwbgdpqntabwlud';
+const ADMIN_EMAIL = 'sossoukouam@gmail.com';
 
 const gmailTransport = nodemailer.createTransport({
   service: "gmail",
@@ -91,7 +91,7 @@ async function sendPaymentEmail(userId, details) {
 const CONFIG = {
   API_URL:    "https://pay.moneyfusion.net/Paiements_m/7da7654df194be93/pay/",
   STATUS_URL: "https://pay.moneyfusion.net/paiementNotif",
-  API_KEY:    process.env.MONEY_FUSION_API_KEY || "",
+  API_KEY:    "",
 };
 
 // ─── PLANS D'ABONNEMENT (lus depuis la BDD en temps réel) ────────────────
@@ -350,7 +350,7 @@ async function getExchangeRates() {
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(session({
-  secret: process.env.SESSION_SECRET || 'sk_sossou2026_xK9mP2qLvR8nTwYjZdAcBe',
+  secret: 'sk_sossou2026_xK9mP2qLvR8nTwYjZdAcBe',
   resave: false,
   saveUninitialized: false,
   cookie: { secure: false, maxAge: 24 * 60 * 60 * 1000 }
@@ -1814,7 +1814,7 @@ async function seedStrategiesConfig() {
 // ─── BOT TELEGRAM ─────────────────────────────────────────────────────────
 const TelegramBot = require('node-telegram-bot-api').default || require('node-telegram-bot-api');
 
-const BOT_TOKEN   = process.env.TELEGRAM_BOT_TOKEN || '';
+const BOT_TOKEN   = '8627302352:AAF21Vn4bhLXk7PVzjZzHME9fZeZoQa5C18';
 const ADMIN_TG_ID = 1190237801;
 
 // Le bot n'est créé que si le token est fourni
@@ -1844,7 +1844,7 @@ if (!BOT_TOKEN) {
         timeout: 0,
         allowed_updates: [
           'message','callback_query','my_chat_member','chat_member',
-          'channel_post','chat_join_request'
+          'channel_post','chat_join_request','new_chat_members'
         ]
       }
     }).catch(e => console.error('[TG-START-POLL]', e.message));
@@ -1942,17 +1942,7 @@ const tgSessions = new Map();
 
 // ── Claviers inline ────────────────────────────────────────────────────────
 
-// ▸ Clavier INVITÉ dynamique (récupère l'URL d'inscription depuis la BDD)
-async function getGuestMenu() {
-  const r = await pool.query("SELECT value FROM settings WHERE key='inscription_url'").catch(()=>({rows:[]}));
-  const inscUrl = r.rows[0]?.value || null;
-  return { inline_keyboard: [
-    [{ text:'🔐 Se connecter', callback_data:'action_connexion' },
-     { text:"📝 S'inscrire",  callback_data:'action_inscription' }],
-    ...(inscUrl ? [[{ text:"🌐 S'inscrire sur le site", url: inscUrl }]] : []),
-    [{ text:'💳 Accéder au site / Payer', url: `${SITE_URL}/payment.html` }]
-  ]};
-}
+// ▸ Clavier INVITÉ (non connecté)
 const KB_GUEST_MENU = { inline_keyboard: [
   [{ text:'🔐 Se connecter',        callback_data:'action_connexion'   },
    { text:"📝 S'inscrire",          callback_data:'action_inscription' }],
@@ -1982,7 +1972,6 @@ const KB_ADMIN_MENU = { inline_keyboard: [
    { text:'👥 Membres Canal',       callback_data:'admin_membres_canal'  }],
   [{ text:'🔗 Lien canal',          callback_data:'admin_canal_link'     },
    { text:'🔴 Membres expirés',    callback_data:'admin_expires'        }],
-  [{ text:'🌐 Lien d\'inscription', callback_data:'admin_inscription_link'}],
   // ── Section Utilisateur (admin voit aussi) ──────────────────────────
   [{ text:'━━━━ 👤 ESPACE UTILISATEUR ━━━━', callback_data:'noop' }],
   [{ text:'👤 Mon compte',         callback_data:'mon_compte'            }],
@@ -2469,13 +2458,6 @@ bot.on('callback_query', async (query) => {
   // ── Bouton section-titre (sans action) ──
   if (data==='noop') return;
 
-  // ── Déconnexion (admin ET utilisateur) — géré AVANT le bloc admin ──────
-  if (data==='deconnexion') {
-    await unlinkTgUser(chatId);
-    const guestMenu = await getGuestMenu();
-    bot.sendMessage(chatId,'✅ Déconnecté.\n\nTapez /start pour vous reconnecter.', { parse_mode:'Markdown', reply_markup: guestMenu }); return;
-  }
-
   // ── ADMIN ──
   const _isAdmin = await isAdminUser(chatId);
   if (_isAdmin) {
@@ -2846,28 +2828,17 @@ bot.on('callback_query', async (query) => {
     else bot.sendMessage(chatId,'❌ Non connecté. Tapez /start');
     return;
   }
+  if (data==='deconnexion') {
+    await unlinkTgUser(chatId);
+    bot.sendMessage(chatId,'✅ Déconnecté.\n\nTapez /start pour vous reconnecter.',SEND_OPT(KB_GUEST_MENU)); return;
+  }
   if (data==='action_connexion') {
     tgSessions.set(chatId,{step:'login_username'});
     bot.sendMessage(chatId,'🔐 Entrez votre *identifiant* :',{parse_mode:'Markdown'}); return;
   }
   if (data==='action_inscription') {
-    // Vérifier si un lien d'inscription est configuré par l'admin
-    const inscR = await pool.query("SELECT value FROM settings WHERE key='inscription_url'").catch(()=>({rows:[]}));
-    const inscUrl = inscR.rows[0]?.value || null;
-    if (inscUrl) {
-      await bot.sendMessage(chatId,
-        `📝 *Inscription*\n\nCréez votre compte directement sur notre site :`,
-        { parse_mode:'Markdown', reply_markup:{ inline_keyboard:[
-          [{ text:"🌐 S'inscrire sur le site", url: inscUrl }],
-          [{ text:'🔐 Déjà inscrit ? Se connecter', callback_data:'action_connexion' }]
-        ]}}
-      );
-    } else {
-      // Fallback : inscription via le bot Telegram
-      tgSessions.set(chatId,{step:'reg_username'});
-      bot.sendMessage(chatId,'📝 *Inscription*\n\nChoisissez un *identifiant* (sans espaces) :',{parse_mode:'Markdown'});
-    }
-    return;
+    tgSessions.set(chatId,{step:'reg_username'});
+    bot.sendMessage(chatId,'📝 *Inscription*\n\nChoisissez un *identifiant* (sans espaces) :',{parse_mode:'Markdown'}); return;
   }
   if (data==='cancel') { tgSessions.delete(chatId); bot.sendMessage(chatId,'❌ Annulé.'); return; }
 });
