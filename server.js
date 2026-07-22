@@ -25,7 +25,7 @@ const SITE_URL = process.env.SITE_URL || 'https://solarium-1-rj14.onrender.com';
 
 // ─── TELEGRAM BOT ────────────────────────────────────────────────────────
 const TelegramBot = require("node-telegram-bot-api");
-const TELEGRAM_BOT_TOKEN = "TON_TOKEN_ICI"; // 🔥 remplace ici
+const TELEGRAM_BOT_TOKEN = "8627302352:AAF21Vn4bhLXk7PVzjZzHME9fZeZoQa5C18"; // 🔥 remplace ici
 
 const bot = new TelegramBot(TELEGRAM_BOT_TOKEN, { polling: true });
 
