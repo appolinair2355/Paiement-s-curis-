@@ -307,19 +307,6 @@ async function initDB() {
         console.log(`✅ Compte admin créé : ${ADMIN_USERNAME} (mot de passe défini via ADMIN_PASSWORD)`);
       }
     }
-    // ── Table des sessions (pour connect-pg-simple) ──────────────────────
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS user_sessions (
-        sid varchar NOT NULL COLLATE "default",
-        sess json NOT NULL,
-        expire timestamp(6) NOT NULL,
-        CONSTRAINT session_pkey PRIMARY KEY (sid)
-      )
-    `).catch(e => console.log('[SESSION-TABLE]', e.message));
-    await pool.query(`
-      CREATE INDEX IF NOT EXISTS IDX_session_expire ON user_sessions (expire)
-    `).catch(e => console.log('[SESSION-IDX]', e.message));
-
     console.log('✅ Base de données initialisée');
   } catch(e) {
     console.error('[INIT-DB]', e.message);
@@ -407,7 +394,7 @@ app.use(express.urlencoded({ extended: true }));
 const SESSION_COOKIE_NAME = 'sk.sid';
 app.set('trust proxy', 1); // Render est derrière un proxy HTTPS
 app.use(session({
-  store: new pgSession({ pool, tableName: 'user_sessions', createTableIfMissing: false }),
+  store: new pgSession({ pool, tableName: 'user_sessions', createTableIfMissing: true }),
   name: SESSION_COOKIE_NAME,
   secret: process.env.SESSION_SECRET || 'sk_sossou2026_xK9mP2qLvR8nTwYjZdAcBe',
   resave: false,
