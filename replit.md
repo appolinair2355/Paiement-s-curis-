@@ -12,11 +12,10 @@ Mobile Money & Crypto payment page powered by the [Money Fusion](https://pay.mon
 ## How to run
 
 ```bash
-npm install   # installs dependencies (first time or after pulling)
-npm start     # starts the server on port 5000
+npm start
 ```
 
-The server starts on **port 5000**. The workflow **Start application** (`npm start`) is pre-configured.
+The server starts on port 5000. The workflow **Start application** (`npm start`) is pre-configured.
 
 ## Project structure
 

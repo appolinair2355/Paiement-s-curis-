@@ -21,14 +21,38 @@ const { StringSession }  = require("telegram/sessions");
 
 const API_ID    = parseInt(process.env.TG_API_ID || "0", 10);
 const API_HASH  = process.env.TG_API_HASH || "";
-const SESSION   = process.env.TG_SESSION || "";
+const ENV_SESSION = process.env.TG_SESSION || "";
 
 let client = null;
 let ready  = false;
+let dbPool = null; // référence pool pg, fournie par server.js via initUserbot(pool)
 
-async function initUserbot() {
+// ── Persistance de la session en base (table settings, clé 'tg_userbot_session') ──
+// Permet de connecter le userbot depuis le bot admin (téléphone + code reçu),
+// sans avoir à repasser par un script local ni par les variables Render.
+async function loadSessionFromDb() {
+  if (!dbPool) return "";
+  try {
+    const r = await dbPool.query("SELECT value FROM settings WHERE key='tg_userbot_session'");
+    return r.rows[0]?.value || "";
+  } catch { return ""; }
+}
+async function saveSessionToDb(sessionString) {
+  if (!dbPool) return;
+  await dbPool.query(
+    `INSERT INTO settings(key,value) VALUES('tg_userbot_session',$1)
+     ON CONFLICT(key) DO UPDATE SET value=$1`,
+    [sessionString]
+  ).catch(e => console.error("[USERBOT-SESSION-SAVE-ERR]", e.message));
+}
+
+async function initUserbot(pool) {
+  dbPool = pool || null;
+  const dbSession = await loadSessionFromDb();
+  const SESSION = dbSession || ENV_SESSION;
+
   if (!API_ID || !API_HASH || !SESSION) {
-    console.log("[USERBOT] TG_API_ID / TG_API_HASH / TG_SESSION non configurés — scan automatique des membres existants désactivé (le bouton d'activation manuelle reste disponible).");
+    console.log("[USERBOT] TG_API_ID / TG_API_HASH / session non configurés — scan automatique des membres existants désactivé (le bouton d'activation manuelle reste disponible). Connecte le compte via le bot admin (🔐 Connecter Userbot).");
     return null;
   }
   try {
@@ -46,6 +70,55 @@ async function initUserbot() {
     return null;
   }
 }
+
+// ============================================================
+// Connexion interactive (téléphone → code Telegram → mot de passe 2FA)
+// Déclenchée UNIQUEMENT depuis le chat privé admin du bot (jamais exposée
+// publiquement) — voir server.js, callback 'admin_userbot_connect'.
+// ============================================================
+let loginClient = null;
+let loginState  = { status: "idle" };  // idle|connecting|awaiting_code|awaiting_password|connected|error
+let pendingResolvers = {};
+
+function waitFor(key) {
+  return new Promise(resolve => { pendingResolvers[key] = resolve; });
+}
+function resolveWaiting(key, value) {
+  if (pendingResolvers[key]) { pendingResolvers[key](value); delete pendingResolvers[key]; return true; }
+  return false;
+}
+
+function getLoginState() { return loginState; }
+
+async function beginLogin(phone) {
+  loginState = { status: "connecting" };
+  pendingResolvers = {};
+  try {
+    loginClient = new TelegramClient(new StringSession(""), API_ID, API_HASH, { connectionRetries: 5 });
+    await loginClient.connect();
+    loginState = { status: "awaiting_code" };
+
+    loginClient.start({
+      phoneNumber: async () => phone,
+      phoneCode:   async () => { loginState = { status: "awaiting_code" };     return await waitFor("code"); },
+      password:    async () => { loginState = { status: "awaiting_password" }; return await waitFor("password"); },
+      onError:     (err) => { loginState = { status: "error", error: err.message }; },
+    }).then(async () => {
+      const sessionString = loginClient.session.save();
+      await saveSessionToDb(sessionString);
+      client = loginClient;
+      ready  = true;
+      loginState = { status: "connected" };
+    }).catch(err => {
+      loginState = { status: "error", error: err.message };
+    });
+  } catch (e) {
+    loginState = { status: "error", error: e.message };
+  }
+}
+
+function submitCode(code)     { return resolveWaiting("code", code); }
+function submitPassword(pw)   { return resolveWaiting("password", pw); }
 
 // Convertit un ID de canal format Bot API (-1001234567890) en entité GramJS
 async function resolveChannelEntity(channelIdRaw) {
@@ -100,4 +173,7 @@ async function scanExistingMembers(channelIdRaw, grantFn) {
 
 function isUserbotReady() { return ready; }
 
-module.exports = { initUserbot, scanExistingMembers, isUserbotReady };
+module.exports = {
+  initUserbot, scanExistingMembers, isUserbotReady,
+  beginLogin, submitCode, submitPassword, getLoginState,
+};

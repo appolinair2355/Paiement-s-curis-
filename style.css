@@ -1022,3 +1022,117 @@ body::before {
   .sub-hero  { padding: 24px 20px; }
   .login-card { padding: 32px 24px; }
 }
+
+/* ══════════════════════════════════════════════════════════════════════
+   ✨ POLISH — animations & micro-interactions additionnelles
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* Transitions douces par défaut sur les éléments interactifs */
+a, button, .stat-card, .tab-btn, .adm-table tr, .btn-login, .btn-primary,
+.btn-logout, .login-card, .modal-box {
+  transition: transform .22s cubic-bezier(.34,1.56,.64,1),
+              box-shadow .22s ease,
+              background .22s ease,
+              border-color .22s ease,
+              opacity .22s ease;
+}
+
+/* Entrée en fondu de la carte de connexion / inscription */
+.login-card { animation: scaleIn .55s cubic-bezier(.34,1.56,.64,1) both; }
+.page-brand { animation: fadeUp .5s ease both; }
+
+/* Titre en dégradé animé */
+.page-brand h1, .admin-hero h2, .logo-text {
+  background: linear-gradient(90deg, #F0C040, #C9A030, #F0C040, #A5B4FC, #F0C040);
+  background-size: 300% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: gradient-flow 6s linear infinite;
+}
+@keyframes gradient-flow {
+  0%   { background-position: 0% 50%; }
+  100% { background-position: 300% 50%; }
+}
+
+/* Cartes statistiques admin : entrée échelonnée + hover flottant */
+.stat-card {
+  animation: fadeUp .5s ease both;
+}
+.stat-card:nth-child(1){ animation-delay:.02s }
+.stat-card:nth-child(2){ animation-delay:.08s }
+.stat-card:nth-child(3){ animation-delay:.14s }
+.stat-card:nth-child(4){ animation-delay:.2s }
+.stat-card:nth-child(5){ animation-delay:.26s }
+.stat-card:hover {
+  transform: translateY(-4px);
+  border-color: rgba(240,192,64,.35);
+  box-shadow: 0 10px 30px rgba(0,0,0,.35), 0 0 0 1px rgba(240,192,64,.15);
+}
+
+/* Onglets admin : indicateur animé */
+.tab-btn { position:relative; overflow:hidden; }
+.tab-btn.active { box-shadow: 0 4px 16px rgba(99,102,241,.25); }
+.tab-btn:hover { transform: translateY(-1px); }
+
+/* Lignes de tableau : légère mise en avant au survol */
+.adm-table tr:hover { transform: scale(1.002); }
+.adm-table tbody tr { animation: fadeIn .35s ease both; }
+
+/* Boutons primaires : lift + glow au survol */
+.btn-primary:hover:not(:disabled), .btn-login:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 28px rgba(240,192,64,.28);
+}
+.btn-primary:active, .btn-login:active { transform: translateY(0) scale(.98); }
+
+/* Bouton déconnexion : retour visuel au clic */
+.btn-logout:hover { transform: translateY(-1px); border-color: rgba(240,113,113,.4); color:#F87171; }
+.btn-logout:active { transform: translateY(0) scale(.96); }
+
+/* Badges avec pulsation douce sur les statuts "en attente" */
+.b-pending, .b-awaiting { animation: badge-pulse 2.2s ease-in-out infinite; }
+@keyframes badge-pulse {
+  0%,100% { box-shadow: 0 0 0 0 rgba(240,192,64,.25); }
+  50%     { box-shadow: 0 0 0 5px rgba(240,192,64,0); }
+}
+
+/* Modales : apparition douce */
+.modal-overlay.open .modal-box { animation: scaleIn .35s cubic-bezier(.34,1.56,.64,1) both; }
+
+/* Barre de défilement discrète et cohérente avec le thème */
+::-webkit-scrollbar { width: 9px; height: 9px; }
+::-webkit-scrollbar-track { background: rgba(255,255,255,.03); }
+::-webkit-scrollbar-thumb { background: rgba(240,192,64,.25); border-radius: 100px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(240,192,64,.45); }
+
+/* Focus clavier visible et élégant (accessibilité) */
+input:focus-visible, select:focus-visible, button:focus-visible, a:focus-visible {
+  outline: 2px solid rgba(240,192,64,.55);
+  outline-offset: 2px;
+}
+
+/* Défilement doux pour toute la page */
+html { scroll-behavior: smooth; }
+
+/* Skeleton loader (utilisable pendant les chargements de données) */
+.skeleton {
+  background: linear-gradient(90deg, rgba(255,255,255,.04) 25%, rgba(255,255,255,.09) 37%, rgba(255,255,255,.04) 63%);
+  background-size: 400% 100%;
+  animation: skeleton-wave 1.4s ease infinite;
+  border-radius: 8px;
+}
+@keyframes skeleton-wave {
+  0%   { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* Réduction des animations pour les personnes qui le préfèrent */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .001ms !important;
+    scroll-behavior: auto !important;
+  }
+}

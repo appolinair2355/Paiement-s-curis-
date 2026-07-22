@@ -224,22 +224,12 @@
         </div>
       </button>
 
-      <button class="panel-btn" id="btnInscription" onclick="openInscription()" style="margin-top:4px">
-        <div class="panel-inner" style="background:linear-gradient(135deg,rgba(16,185,129,.15),rgba(99,102,241,.1));border:1.5px solid rgba(16,185,129,.35)">
-          <div class="panel-icon">📝</div>
-          <div class="panel-text">
-            <h2 style="color:#34D399" id="inscBtnTitle">S'inscrire / S'abonner</h2>
-            <p id="inscBtnDesc">Créez votre compte et souscrivez à nos services.</p>
-          </div>
-          <div class="panel-arrow">›</div>
-        </div>
-      </button>
       <button class="panel-btn" id="btnTelegram" onclick="openTelegramBot()" style="margin-top:4px">
         <div class="panel-inner" style="background:linear-gradient(135deg,rgba(0,136,204,.15),rgba(99,102,241,.1));border:1.5px solid rgba(0,136,204,.35)">
           <div class="panel-icon">🤖</div>
           <div class="panel-text">
             <h2 style="color:#60C8F5">Accéder via Telegram</h2>
-            <p>Connectez-vous ou gérez votre abonnement via le bot.</p>
+            <p>Connectez-vous ou inscrivez-vous via le bot.</p>
           </div>
           <div class="panel-arrow">›</div>
         </div>
@@ -345,7 +335,10 @@
 
           <p style="text-align:center;font-size:.8rem;color:rgba(255,255,255,.4);margin:12px 0 0">
             Pas encore de compte ?
-            <a id="tgRegLink" href="#" target="_blank" style="color:#60C8F5;font-size:.8rem;text-decoration:underline">S'inscrire via le bot Telegram 🤖</a>
+            <a href="/register.html" style="color:#F0C040;font-size:.8rem;text-decoration:underline;font-weight:600">Créer un compte 📝</a>
+          </p>
+          <p id="tgAltWrap" style="text-align:center;font-size:.76rem;color:rgba(255,255,255,.3);margin:2px 0 0" class="hidden">
+            ou <a id="tgRegLink" href="#" target="_blank" style="color:#60C8F5;text-decoration:underline">via le bot Telegram 🤖</a>
           </p>
         </div>
       </form>
@@ -727,40 +720,22 @@
 
    // ── OUVERTURE VIA SITE WEB ──
 let _siteUrl = '';
-let _inscriptionUrl = '';
 
 fetch('/api/config')
   .then(r => r.json())
   .then(d => {
     _siteUrl = d.site_url || '';
-    const siteLink = document.getElementById('siteLink');
-    if (siteLink) siteLink.href = _siteUrl || '#';
-  })
-  .catch(() => {});
 
-// Charger l'URL d'inscription configurée par l'admin
-fetch('/api/admin/dashboard')
-  .then(r => r.ok ? r.json() : null)
-  .then(d => {
-    if (d && d.inscription_url) {
-      _inscriptionUrl = d.inscription_url;
-      const t = document.getElementById('inscBtnTitle');
-      const p = document.getElementById('inscBtnDesc');
-      if (t) t.textContent = "S'inscrire / S'abonner";
-      if (p) p.textContent = "Créez votre compte et accédez à nos services.";
-    }
+    const link = _siteUrl ? _siteUrl : '#';
+    const siteLink = document.getElementById('siteLink');
+
+    if (siteLink) siteLink.href = link;
   })
   .catch(() => {});
 
 function openWebsite(){
   const url = _siteUrl ? _siteUrl : '#';
   if (url !== '#') window.open(url, '_blank');
-}
-
-function openInscription(){
-  const url = _inscriptionUrl || _siteUrl || null;
-  if (url) { window.open(url, '_blank'); }
-  else { goto('login'); } // fallback : page connexion
 }
 
     // ── DÉCONNEXION ──
