@@ -81,22 +81,33 @@
           <div class="section-label">Que souhaitez-vous faire ?</div>
           <div class="action-grid">
 
-            <a href="/payment.html" class="action-card">
-              <div class="ac-icon gold">🔄</div>
+            <a href="/payment.html?cat=abonnement" class="action-card">
+              <div class="ac-icon gold">📅</div>
               <div class="ac-text">
-                <h4>Renouveler</h4>
-                <p>Prolonger mon abonnement</p>
+                <h4>Abonnement</h4>
+                <p>1€/J · 12€/15J · 30€/Mois</p>
               </div>
               <svg class="ac-arrow" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <polyline points="9 18 15 12 9 6"/>
               </svg>
             </a>
 
-            <a href="/payment.html" class="action-card">
-              <div class="ac-icon blue">💳</div>
+            <a href="/payment.html?cat=telegram" class="action-card">
+              <div class="ac-icon blue">✈️</div>
               <div class="ac-text">
-                <h4>Souscrire</h4>
-                <p>Acheter un nouvel abonnement</p>
+                <h4>Service Telegram</h4>
+                <p>Montant libre — Mobile Money ou Crypto</p>
+              </div>
+              <svg class="ac-arrow" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="9 18 15 12 9 6"/>
+              </svg>
+            </a>
+
+            <a href="/payment.html?cat=maintenance" class="action-card">
+              <div class="ac-icon" style="background:linear-gradient(135deg,#10B981,#059669);color:#fff">🔧</div>
+              <div class="ac-text">
+                <h4>Service de Maintenance</h4>
+                <p>Montant libre — Mobile Money ou Crypto</p>
               </div>
               <svg class="ac-arrow" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <polyline points="9 18 15 12 9 6"/>
@@ -210,7 +221,7 @@
 
     async function load(){
       try {
-        const r=await fetch('/api/me',{cache:'no-store'});
+        const r=await fetch('/api/me');
         if(r.status===401){ window.location.href='/'; return; }
         user=await r.json();
         render(user);
@@ -218,10 +229,6 @@
         document.getElementById('dashContent').classList.remove('hidden');
       } catch { window.location.href='/'; }
     }
-
-    // Si la page revient depuis le cache "retour arrière" (bfcache) après
-    // une déconnexion, on revérifie immédiatement la session.
-    window.addEventListener('pageshow', (e)=>{ if(e.persisted) load(); });
 
     function render(u){
       document.getElementById('navUser').textContent = u.username;
@@ -279,7 +286,8 @@
     }
 
     async function logout(){
-      try{ await fetch('/api/logout',{method:'POST'}); } finally { location.replace('/'); }
+      await fetch('/api/logout',{method:'POST'});
+      window.location.href='/';
     }
 
     // ─── BOUTIQUE ──────────────────────────────────────────────────────
@@ -485,6 +493,14 @@
       document.getElementById('mfFrame').src='about:blank';
     }
 
+    // Rediriger l'admin vers son espace dédié
+    async function load(){
+      const r=await fetch('/api/me');
+      if(!r.ok){ window.location.href='/'; return; }
+      const u=await r.json();
+      if(u.is_admin){ window.location.href='/admin.html'; return; }
+      initDash(u);
+    }
     load();
     loadShop();
   </script>
