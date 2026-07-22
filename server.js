@@ -1,23 +1,4 @@
-// ============================================================
-// SOSSOU KOUAMÉ — Serveur Express complet
-// Login + Dashboard + Paiement Money Fusion + Crypto + BDD Render
-// ============================================================
-
-const express    = require("express");
-const path       = require("path");
-const { Pool }   = require("pg");
-const bcrypt     = require("bcrypt");
-const session    = require("express-session");
-const nodemailer = require("nodemailer");
-
-const app  = express();
-const PORT = process.env.PORT || 5000;
-
-// ─── URL DU SITE (pour les boutons Telegram / emails) ─────────────────────
-const SITE_URL = process.env.SITE_URL || 'https://sossou-kouame-paiement.onrender.com';
-
-// ─── BASE DE DONNÉES ──────────────────────────────────────────────────────
-const DB_URL = process.env.DATABASE_URL;
+const DB_URL = 'postgresql://bonjour_user:WzeZsFKlKWU180iOFxngBEaThdG1kKUR@dpg-d962464s728c73e8p250-a.oregon-postgres.render.com/bonjour';
 const pool = new Pool({
   connectionString: DB_URL,
   ssl: { rejectUnauthorized: false },
@@ -27,9 +8,9 @@ const pool = new Pool({
 });
 
 // ─── EMAIL (nodemailer / Gmail) ───────────────────────────────────────────
-const GMAIL_USER  = process.env.GMAIL_USER  || '';
-const GMAIL_PASS  = process.env.GMAIL_PASS  || '';
-const ADMIN_EMAIL = process.env.ADMIN_EMAIL || '';
+const GMAIL_USER  = 'sossoukouam@gmail.com';
+const GMAIL_PASS  = 'gcwbgdpqntabwlud';
+const ADMIN_EMAIL = 'sossoukouam@gmail.com';
 
 const gmailTransport = nodemailer.createTransport({
   service: "gmail",
@@ -86,6 +67,26 @@ async function sendPaymentEmail(userId, details) {
     console.error("[EMAIL-ERR]", e.message);
   }
 }
+// ============================================================
+// SOSSOU KOUAMÉ — Serveur Express complet
+// Login + Dashboard + Paiement Money Fusion + Crypto + BDD Render
+// ============================================================
+
+const express    = require("express");
+const path       = require("path");
+const { Pool }   = require("pg");
+const bcrypt     = require("bcrypt");
+const session    = require("express-session");
+const nodemailer = require("nodemailer");
+
+const app  = express();
+const PORT = process.env.PORT || 5000;
+
+// ─── URL DU SITE (pour les boutons Telegram / emails) ─────────────────────
+const SITE_URL = process.env.SITE_URL || 'https://sossou-kouame-paiement.onrender.com';
+
+// ─── BASE DE DONNÉES ──────────────────────────────────────────────────────
+
 
 // ─── MONEY FUSION ─────────────────────────────────────────────────────────
 const CONFIG = {
