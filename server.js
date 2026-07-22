@@ -23,32 +23,12 @@ const PORT = process.env.PORT || 10000;
 // ─── URL DU SITE (pour les boutons Telegram / emails) ─────────────────────
 const SITE_URL = process.env.SITE_URL || 'https://solarium-1-rj14.onrender.com';
 
-// ─── IMPORTS ─────────────────────────────────────────────────────────────
-const { Pool } = require("pg");
-const nodemailer = require("nodemailer");
-const TelegramBot = require("node-telegram-bot-api");
-
-
-// ─── TELEGRAM BOT ────────────────────────────────────────────────────────
-const TELEGRAM_BOT_TOKEN = "TON_TOKEN_ICI"; // 🔥 remplace ici
-
-const bot = new TelegramBot(TELEGRAM_BOT_TOKEN, { polling: true });
-
-bot.on("message", (msg) => {
-  const chatId = msg.chat.id;
-  const text = msg.text;
-
-  if (text === "/start") {
-    bot.sendMessage(chatId, "👋 Bienvenue sur Sossou Kouamé Shopping Boutique !");
-  } else {
-    bot.sendMessage(chatId, "✅ Message reçu !");
-  }
-});
-
-
-// ─── BASE DE DONNÉES ─────────────────────────────────────────────────────
-const DB_URL = 'postgresql://bonjour_user:WzeZsFKlKWU180iOFxngBEaThdG1kKUR@dpg-d962464s728c73e8p250-a.oregon-postgres.render.com/bonjour';
-
+// ─── BASE DE DONNÉES ──────────────────────────────────────────────────────
+// ⚠️ Toujours fournir DATABASE_URL (ou DB_URL) en variable d'environnement sur Render.
+const DB_URL = process.env.DATABASE_URL || process.env.DB_URL || '';
+if (!DB_URL) {
+  console.error('[FATAL] Aucune variable DATABASE_URL / DB_URL définie. Configurez-la dans Render → Environment → Variables.');
+}
 const pool = new Pool({
   connectionString: DB_URL,
   ssl: { rejectUnauthorized: false },
@@ -57,36 +37,28 @@ const pool = new Pool({
   connectionTimeoutMillis: 10000,
 });
 
-
-// ─── EMAIL (nodemailer / Gmail) ──────────────────────────────────────────
-const GMAIL_USER  = 'sossoukouam@gmail.com';
-const GMAIL_PASS  = 'gcwbgdpqntabwlud';
-const ADMIN_EMAIL = 'sossoukouam@gmail.com';
+// ─── EMAIL (nodemailer / Gmail) ───────────────────────────────────────────
+const GMAIL_USER  = process.env.GMAIL_USER  || '';
+const GMAIL_PASS  = process.env.GMAIL_PASS  || '';
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL || GMAIL_USER;
 
 const gmailTransport = nodemailer.createTransport({
   service: "gmail",
   auth: { user: GMAIL_USER, pass: GMAIL_PASS },
 });
 
-
-// ─── FONCTION EMAIL ──────────────────────────────────────────────────────
 async function sendPaymentEmail(userId, details) {
   if (!GMAIL_USER || !GMAIL_PASS) return;
-
   try {
     const r = await pool.query(
       "SELECT username, first_name, last_name, email FROM users WHERE id = $1",
       [userId]
     );
-
     if (!r.rows.length) return;
-
     const u = r.rows[0];
     const toEmail = u.email || `${u.username}@gmail.com`;
     const name = [u.first_name, u.last_name].filter(Boolean).join(" ") || u.username;
-
     const subject = `✅ Paiement confirmé — ${details.label}`;
-
     const html = `
 <div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;background:#0a0f1e;color:#fff;border-radius:12px;overflow:hidden">
   <div style="background:linear-gradient(135deg,#F0C040,#C9A030);padding:28px 32px;text-align:center">
@@ -98,57 +70,33 @@ async function sendPaymentEmail(userId, details) {
       Votre paiement a bien été <strong style="color:#10B981">confirmé et validé</strong>.<br>
       Merci pour votre confiance !
     </p>
+    <div style="background:rgba(255,255,255,0.06);border:1px solid rgba(240,192,64,0.3);border-radius:10px;padding:20px;margin:20px 0">
+      <table style="width:100%;border-collapse:collapse;font-size:.92rem">
+        <tr><td style="color:rgba(255,255,255,0.5);padding:6px 0">Service</td><td style="color:#fff;font-weight:700;text-align:right">${details.label}</td></tr>
+        ${details.amount ? `<tr><td style="color:rgba(255,255,255,0.5);padding:6px 0">Montant</td><td style="color:#F0C040;font-weight:700;text-align:right">${details.amount}</td></tr>` : ""}
+        ${details.duration ? `<tr><td style="color:rgba(255,255,255,0.5);padding:6px 0">Durée</td><td style="color:#fff;text-align:right">${details.duration}</td></tr>` : ""}
+        <tr><td style="color:rgba(255,255,255,0.5);padding:6px 0">Statut</td><td style="color:#10B981;font-weight:700;text-align:right">✓ Validé</td></tr>
+      </table>
+    </div>
+    <p style="color:rgba(255,255,255,0.6);font-size:.88rem">
+      Pour toute question, répondez à cet email ou contactez-nous directement.
+    </p>
+    <div style="text-align:center;margin-top:24px">
+      <span style="color:#F0C040;font-size:.8rem">© 2026 Sossou Kouamé Shopping Boutique</span>
+    </div>
   </div>
 </div>`;
-
     await gmailTransport.sendMail({
       from: `"Sossou Kouamé" <${GMAIL_USER}>`,
       to: toEmail,
       subject,
       html,
     });
-
     console.log("[EMAIL] Envoyé à", toEmail);
-
   } catch (e) {
     console.error("[EMAIL-ERR]", e.message);
   }
 }
-
-
-// ─── EXEMPLE : APRÈS PAIEMENT ────────────────────────────────────────────
-async function onPaymentSuccess(userId) {
-  const details = {
-    label: "Abonnement VIP",
-    amount: "5000 FCFA",
-    duration: "30 jours"
-  };
-
-  // Email
-  await sendPaymentEmail(userId, details);
-
-  // Telegram (si user a chatId enregistré)
-  try {
-    const r = await pool.query(
-      "SELECT telegram_chat_id FROM users WHERE id = $1",
-      [userId]
-    );
-
-    if (r.rows.length && r.rows[0].telegram_chat_id) {
-      await bot.sendMessage(
-        r.rows[0].telegram_chat_id,
-        "✅ Paiement confirmé ! Merci pour ton abonnement 🎉"
-      );
-    }
-
-  } catch (e) {
-    console.log("[TG-ERR]", e.message);
-  }
-}
-
-
-// ─── TEST SERVEUR ────────────────────────────────────────────────────────
-console.log("🚀 Serveur démarré avec succès !");
 
 // ─── MONEY FUSION ─────────────────────────────────────────────────────────
 const CONFIG = {
